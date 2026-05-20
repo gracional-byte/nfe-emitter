@@ -93,6 +93,56 @@ export const nfeRouter = router({
   }),
 
   /**
+   * Upload de certificado digital
+   */
+  uploadCertificate: protectedProcedure
+    .input(CertificateUploadSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Validar certificado PEM
+        if (!input.certificateContent.includes('-----BEGIN') || !input.certificateContent.includes('-----END')) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Arquivo inválido. Por favor, envie um certificado em formato PEM',
+          });
+        }
+
+        // Gerar thumbprint
+        const thumbprint = generateThumbprint(input.certificateName);
+
+        // Criar certificado
+        await createCertificate({
+          userId: ctx.user.id,
+          certificateName: input.certificateName,
+          certificateKeyContent: input.certificateContent,
+          thumbprint,
+          isActive: 1,
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 ano
+        });
+
+        await createAuditLog({
+          userId: ctx.user.id,
+          action: 'upload_certificate',
+          details: `Certificado ${input.certificateName} enviado`,
+          ipAddress: ctx.req.ip,
+        });
+
+        await notifyOwner({
+          title: 'Novo Certificado Digital',
+          content: `Um novo certificado digital foi enviado: ${input.certificateName}`,
+        });
+
+        return { success: true, message: 'Certificado enviado com sucesso' };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Erro ao enviar certificado';
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message,
+        });
+      }
+    }),
+
+  /**
    * Emissão de RPS
    */
   emitRps: protectedProcedure

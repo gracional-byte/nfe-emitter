@@ -9,6 +9,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { CertificateUpload } from '@/components/CertificateUpload';
 
 const CompanyConfigSchema = z.object({
   cnpj: z.string().min(14, 'CNPJ inválido').max(18),
@@ -22,7 +23,7 @@ const CompanyConfigSchema = z.object({
 
 type CompanyConfigFormData = z.infer<typeof CompanyConfigSchema>;
 
-export default function Settings() {
+function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const getConfigQuery = trpc.nfe.getCompanyConfig.useQuery();
   const updateConfigMutation = trpc.nfe.updateCompanyConfig.useMutation();
@@ -79,9 +80,11 @@ export default function Settings() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Configurações da Empresa</h1>
         <p className="text-muted-foreground mt-2">
-          Gerencie os dados tributários padrão que serão utilizados na emissão de notas fiscais.
+          Gerencie os dados tributários padrão e certificados digitais que serão utilizados na emissão de notas fiscais.
         </p>
       </div>
+
+      <CertificateUpload />
 
       <Card>
         <CardHeader>
@@ -225,3 +228,5 @@ export default function Settings() {
     </div>
   );
 }
+
+export default Settings;

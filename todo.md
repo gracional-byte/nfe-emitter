@@ -99,3 +99,11 @@
 - [x] Implementar carregamento de certificados do banco de dados
 - [x] Adicionar procedure tRPC getCertificates
 - [x] Atualizar componente CertificateSelector para usar dados reais
+
+
+## Upload de Certificados (Sessão Atual)
+- [x] Criar componente CertificateUpload
+- [x] Adicionar procedure tRPC uploadCertificate
+- [x] Integrar CertificateUpload na página Settings
+- [x] Validação de certificado PEM
+- [x] Armazenamento de certificado no banco de dados
