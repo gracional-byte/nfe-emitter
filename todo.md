@@ -92,3 +92,10 @@
 
 ## Status Final
 ✅ SISTEMA COMPLETO - Todos os requisitos principais implementados e testados
+
+
+## Correções de Certificado (Sessão Atual)
+- [x] Remover certificado mock hardcoded do CertificateSelector
+- [x] Implementar carregamento de certificados do banco de dados
+- [x] Adicionar procedure tRPC getCertificates
+- [x] Atualizar componente CertificateSelector para usar dados reais

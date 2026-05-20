@@ -86,6 +86,13 @@ export const nfeRouter = router({
     }),
 
   /**
+   * Listar certificados do usuário
+   */
+  getCertificates: protectedProcedure.query(async ({ ctx }) => {
+    return getCertificatesByUser(ctx.user.id);
+  }),
+
+  /**
    * Emissão de RPS
    */
   emitRps: protectedProcedure
