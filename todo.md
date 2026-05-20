@@ -63,10 +63,11 @@
 - [x] Implementar login via Manus OAuth
 - [x] Criar proteção de rotas (apenas admin pode acessar)
 - [x] Implementar logout
+- [x] Adicionar validação algorítmica de CPF/CNPJ no front-end
 
 ## Testes
 - [ ] Escrever testes unitários para assinatura XML
-- [ ] Escrever testes para validação de dados
+- [x] Escrever testes para validação de CPF/CNPJ
 - [ ] Testar integração SOAP com prefeitura (mock)
 
 ## Deployment

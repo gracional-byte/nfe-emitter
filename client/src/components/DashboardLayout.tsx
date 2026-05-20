@@ -27,13 +27,20 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: FileText, label: "Emitir RPS", path: "/emit" },
-  { icon: History, label: "Histórico", path: "/history" },
-  { icon: Shield, label: "Certificados", path: "/certificates" },
-  { icon: SettingsIcon, label: "Configurações", path: "/settings" },
-];
+const getMenuItems = (isAdmin: boolean) => {
+  const baseItems = [
+    { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  ];
+  
+  const adminItems = [
+    { icon: FileText, label: "Emitir RPS", path: "/emit" },
+    { icon: History, label: "Histórico", path: "/history" },
+    { icon: Shield, label: "Certificados", path: "/certificates" },
+    { icon: SettingsIcon, label: "Configurações", path: "/settings" },
+  ];
+  
+  return isAdmin ? [...baseItems, ...adminItems] : baseItems;
+};
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 280;
@@ -115,6 +122,8 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const isAdmin = user?.role === 'admin';
+  const menuItems = getMenuItems(isAdmin);
   const activeMenuItem = menuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 

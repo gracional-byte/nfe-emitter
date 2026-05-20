@@ -11,10 +11,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { Loader2, Send, AlertCircle } from 'lucide-react';
+import { isValidCPFOrCNPJ } from '@/lib/validation';
 
 const EmitRpsSchema = z.object({
   clientName: z.string().min(1, 'Nome do cliente obrigatório'),
-  clientCpfCnpj: z.string().min(11, 'CPF ou CNPJ inválido'),
+  clientCpfCnpj: z.string().min(11, 'CPF ou CNPJ inválido').refine(isValidCPFOrCNPJ, 'CPF ou CNPJ inválido'),
   clientAddress: z.string().min(1, 'Endereço obrigatório'),
   clientCity: z.string(),
   clientState: z.string(),
@@ -33,14 +34,14 @@ export default function EmitRps() {
   const emitRpsMutation = trpc.nfe.emitRps.useMutation();
 
   const form = useForm<EmitRpsFormData>({
-    resolver: zodResolver(EmitRpsSchema) as any,
+    resolver: zodResolver(EmitRpsSchema),
     defaultValues: {
       clientName: '',
       clientCpfCnpj: '',
       clientAddress: '',
       clientCity: 'São Paulo',
       clientState: 'SP',
-      clientCep: '01001000',
+      clientCep: '',
       serviceDescription: '',
       serviceValue: '',
       deductions: '0',
@@ -133,7 +134,15 @@ export default function EmitRps() {
                     <FormItem>
                       <FormLabel>CPF ou CNPJ</FormLabel>
                       <FormControl>
-                        <Input placeholder="000.000.000-00 ou 00.000.000/0000-00" {...field} />
+                        <Input 
+                          placeholder="000.000.000-00 ou 00.000.000/0000-00" 
+                          {...field}
+                          onChange={(e) => {
+                            // Remove caracteres não numéricos para validação
+                            const value = e.target.value.replace(/\D/g, '');
+                            field.onChange(value);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

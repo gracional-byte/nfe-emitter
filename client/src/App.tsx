@@ -10,16 +10,21 @@ import EmitRps from "./pages/EmitRps";
 import InvoiceHistory from "./pages/InvoiceHistory";
 import Certificates from "./pages/Certificates";
 import Settings from "./pages/Settings";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
+  const { user } = useAuth();
+  
+  // Verifica se o usuário é admin
+  const isAdmin = user?.role === 'admin';
+
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
-      <Route path="/emit" component={EmitRps} />
-      <Route path="/history" component={InvoiceHistory} />
-      <Route path="/certificates" component={Certificates} />
-      <Route path="/settings" component={Settings} />
+      {isAdmin && <Route path="/emit" component={EmitRps} />}
+      {isAdmin && <Route path="/history" component={InvoiceHistory} />}
+      {isAdmin && <Route path="/certificates" component={Certificates} />}
+      {isAdmin && <Route path="/settings" component={Settings} />}
       <Route path="/404" component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
