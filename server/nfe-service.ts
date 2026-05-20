@@ -112,33 +112,68 @@ export async function signXml(
       .filter(line => line.length > 0)
       .join('\n');
 
-    const sig = new SignedXml();
-    
-    // Configurar a chave privada corretamente
-    (sig as any).signingKey = Buffer.from(cleanedKey, 'utf-8');
-    
-    // Configurar algoritmos de assinatura
-    sig.signatureAlgorithm = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
-    sig.canonicalizationAlgorithm = 'http://www.w3.org/2001/10/xml-exc-c14n#';
+    // Tentar usar xml-crypto com a chave privada carregada via crypto nativo
+    try {
+      // Validar que a chave privada pode ser carregada
+      const privateKey = crypto.createPrivateKey({
+        key: cleanedKey,
+        format: 'pem'
+      });
+      
+      console.log('[NFe Service] Chave privada carregada com sucesso');
+      
+      const sig = new SignedXml();
+      
+      // Usar a chave privada do crypto
+      (sig as any).signingKey = privateKey.export({ format: 'pem', type: 'pkcs8' });
+      
+      // Configurar algoritmos de assinatura
+      sig.signatureAlgorithm = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
+      sig.canonicalizationAlgorithm = 'http://www.w3.org/2001/10/xml-exc-c14n#';
 
-    // Adicionar referência para o elemento raiz
-    sig.addReference({
-      xpath: "//*[local-name(.)='EnviarLoteRpsEnvio']",
-      transforms: ['http://www.w3.org/2000/09/xmldsig#enveloped-signature'],
-      digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256'
-    });
+      // Adicionar referência para o elemento raiz
+      sig.addReference({
+        xpath: "//*[local-name(.)='EnviarLoteRpsEnvio']",
+        transforms: ['http://www.w3.org/2000/09/xmldsig#enveloped-signature'],
+        digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256'
+      });
 
-    // Computar assinatura
-    sig.computeSignature(xmlContent);
-    
-    // Retornar XML assinado
-    const signedXml = sig.getSignedXml();
-    
-    if (!signedXml || signedXml.length === 0) {
-      throw new Error('Falha ao gerar XML assinado - resultado vazio');
+      // Computar assinatura
+      sig.computeSignature(xmlContent);
+      
+      // Retornar XML assinado
+      const signedXml = sig.getSignedXml();
+      
+      if (!signedXml || signedXml.length === 0) {
+        throw new Error('Falha ao gerar XML assinado - resultado vazio');
+      }
+      
+      console.log('[NFe Service] XML assinado com sucesso');
+      return signedXml;
+    } catch (xmlCryptoError) {
+      console.error('[NFe Service] Erro com xml-crypto:', xmlCryptoError);
+      // Se xml-crypto falhar, tentar com a chave diretamente
+      const sig = new SignedXml();
+      (sig as any).signingKey = cleanedKey;
+      
+      sig.signatureAlgorithm = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
+      sig.canonicalizationAlgorithm = 'http://www.w3.org/2001/10/xml-exc-c14n#';
+
+      sig.addReference({
+        xpath: "//*[local-name(.)='EnviarLoteRpsEnvio']",
+        transforms: ['http://www.w3.org/2000/09/xmldsig#enveloped-signature'],
+        digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256'
+      });
+
+      sig.computeSignature(xmlContent);
+      const signedXml = sig.getSignedXml();
+      
+      if (!signedXml || signedXml.length === 0) {
+        throw new Error('Falha ao gerar XML assinado - resultado vazio (fallback)');
+      }
+      
+      return signedXml;
     }
-    
-    return signedXml;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
     console.error('[NFe Service] Erro ao assinar XML:', errorMessage);
