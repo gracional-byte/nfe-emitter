@@ -8,7 +8,6 @@ import DashboardLayout from "./components/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import EmitRps from "./pages/EmitRps";
 import InvoiceHistory from "./pages/InvoiceHistory";
-import Certificates from "./pages/Certificates";
 import Settings from "./pages/Settings";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -23,7 +22,6 @@ function Router() {
       <Route path="/" component={Dashboard} />
       {isAdmin && <Route path="/emit" component={EmitRps} />}
       {isAdmin && <Route path="/history" component={InvoiceHistory} />}
-      {isAdmin && <Route path="/certificates" component={Certificates} />}
       {isAdmin && <Route path="/settings" component={Settings} />}
       <Route path="/404" component={NotFound} />
       {/* Final fallback route */}

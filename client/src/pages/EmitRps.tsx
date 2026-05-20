@@ -12,6 +12,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { Loader2, Send, AlertCircle } from 'lucide-react';
 import { isValidCPFOrCNPJ } from '@/lib/validation';
+import { CertificateSelector } from '@/components/CertificateSelector';
+
 
 const EmitRpsSchema = z.object({
   clientName: z.string().min(1, 'Nome do cliente obrigatório'),
@@ -30,6 +32,7 @@ type EmitRpsFormData = z.infer<typeof EmitRpsSchema>;
 
 export default function EmitRps() {
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedCert, setSelectedCert] = useState<any>(null);
   const getConfigQuery = trpc.nfe.getConfig.useQuery();
   const emitRpsMutation = trpc.nfe.emitRps.useMutation();
 
@@ -95,6 +98,25 @@ export default function EmitRps() {
 
   return (
     <div className="space-y-8">
+      {/* Seletor de Certificado */}
+      <Card>
+        <CardHeader>
+          <CardTitle>1. Selecione seu Certificado Digital</CardTitle>
+          <CardDescription>Escolha o certificado digital instalado no seu computador</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CertificateSelector onCertificateSelected={setSelectedCert} />
+        </CardContent>
+      </Card>
+
+      {!selectedCert && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Selecione um certificado digital para continuar
+          </AlertDescription>
+        </Alert>
+      )}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Emitir RPS</h1>
         <p className="text-muted-foreground mt-2">

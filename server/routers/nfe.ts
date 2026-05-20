@@ -125,6 +125,7 @@ export const nfeRouter = router({
           certificateName: input.certificateName,
           certificateKeyUrl: url,
           certificateKeyStorageKey: storageKey,
+          certificateKeyContent: input.certificateContent,
           thumbprint,
           isActive: 1,
         });
@@ -206,10 +207,22 @@ export const nfeRouter = router({
           incentivadorCultural: config.incentivadorCultural,
         });
 
-        // Obter chave privada do S3
-        const { url: keyUrl } = await storageGet(certificate.certificateKeyStorageKey);
-        const response = await fetch(keyUrl);
-        const privateKeyContent = await response.text();
+        // Obter chave privada do banco de dados
+        let privateKeyContent = '';
+        try {
+          if (!certificate.certificateKeyContent) {
+            throw new Error('Certificado digital nao encontrado no banco de dados');
+          }
+          privateKeyContent = certificate.certificateKeyContent;
+          if (!privateKeyContent.includes('-----BEGIN')) {
+            throw new Error('Conteudo de certificado invalido');
+          }
+        } catch (error) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao recuperar certificado digital: ${error instanceof Error ? error.message : 'Desconhecido'}`,
+          });
+        }
 
         // Assinar XML
         const signedXml = await signXml(xmlContent, privateKeyContent, certificate.thumbprint);

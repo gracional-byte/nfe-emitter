@@ -15,6 +15,13 @@
       "when": 1779277018501,
       "tag": "0001_giant_firestar",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1779284051328,
+      "tag": "0002_amused_lockheed",
+      "breakpoints": true
     }
   ]
 }

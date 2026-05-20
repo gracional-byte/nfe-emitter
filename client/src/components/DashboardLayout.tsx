@@ -35,7 +35,6 @@ const getMenuItems = (isAdmin: boolean) => {
   const adminItems = [
     { icon: FileText, label: "Emitir RPS", path: "/emit" },
     { icon: History, label: "Histórico", path: "/history" },
-    { icon: Shield, label: "Certificados", path: "/certificates" },
     { icon: SettingsIcon, label: "Configurações", path: "/settings" },
   ];
   

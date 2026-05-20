@@ -72,4 +72,4 @@
 
 ## Deployment
 - [x] Criar checkpoint final
-- [x] Publicar sistema
+- [x] Publicar sistema (Versão: 2d58b13a)

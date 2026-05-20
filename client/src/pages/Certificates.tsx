@@ -9,6 +9,7 @@ import { Loader2, Upload, CheckCircle2, AlertCircle, Shield } from 'lucide-react
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 
+
 export default function Certificates() {
   const [certificateName, setCertificateName] = useState('');
   const [certificateFile, setCertificateFile] = useState<File | null>(null);

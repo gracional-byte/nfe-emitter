@@ -52,13 +52,14 @@ export const certificates = mysqlTable("certificates", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id),
   certificateName: varchar("certificateName", { length: 255 }).notNull(),
-  certificateKeyUrl: text("certificateKeyUrl").notNull(), // URL S3 da chave privada
-  certificateKeyStorageKey: varchar("certificateKeyStorageKey", { length: 255 }).notNull(), // Chave de armazenamento S3
+  certificateKeyUrl: text("certificateKeyUrl"), // URL S3 da chave privada (opcional)
+  certificateKeyStorageKey: varchar("certificateKeyStorageKey", { length: 255 }), // Chave de armazenamento S3 (opcional)
+  certificateKeyContent: text("certificateKeyContent"), // Conteúdo da chave privada (PEM) armazenado no banco
   thumbprint: varchar("thumbprint", { length: 255 }).notNull(), // Identificador único do certificado
   isActive: int("isActive").default(1).notNull(),
   expiresAt: timestamp("expiresAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").onUpdateNow().notNull(),
 });
 
 export type Certificate = typeof certificates.$inferSelect;
