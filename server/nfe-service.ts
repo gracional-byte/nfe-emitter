@@ -101,14 +101,21 @@ export async function signXml(
 ): Promise<string> {
   try {
     // Validar que a chave privada está em formato PEM válido
-    if (!privateKeyContent.includes('-----BEGIN') || !privateKeyContent.includes('-----END')) {
-      throw new Error('Chave privada em formato PEM inválido');
+    if (!privateKeyContent || !privateKeyContent.includes('-----BEGIN') || !privateKeyContent.includes('-----END')) {
+      throw new Error('Chave privada em formato PEM inválido ou vazia');
     }
+
+    // Limpar a chave privada (remover espaços extras e quebras de linha desnecessárias)
+    const cleanedKey = privateKeyContent
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .join('\n');
 
     const sig = new SignedXml();
     
-    // Configurar a chave privada como Buffer
-    (sig as any).signingKey = Buffer.from(privateKeyContent);
+    // Configurar a chave privada corretamente
+    (sig as any).signingKey = Buffer.from(cleanedKey, 'utf-8');
     
     // Configurar algoritmos de assinatura
     sig.signatureAlgorithm = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
@@ -125,9 +132,16 @@ export async function signXml(
     sig.computeSignature(xmlContent);
     
     // Retornar XML assinado
-    return sig.getSignedXml();
+    const signedXml = sig.getSignedXml();
+    
+    if (!signedXml || signedXml.length === 0) {
+      throw new Error('Falha ao gerar XML assinado - resultado vazio');
+    }
+    
+    return signedXml;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.error('[NFe Service] Erro ao assinar XML:', errorMessage);
     throw new Error(`Falha ao assinar XML: ${errorMessage}`);
   }
 }
