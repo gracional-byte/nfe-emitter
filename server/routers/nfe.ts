@@ -12,7 +12,7 @@ import {
   getInvoiceStats,
   createAuditLog,
 } from '../db';
-import { signXml, generateRpsXml, validateCpfOrCnpj, validatePrivateKey, generateThumbprint } from '../nfe-service';
+import { signXml, generateRpsXml, validateCpfOrCnpj, validatePrivateKey, generateThumbprint, generateDanfsePdf } from '../nfe-service';
 import { storagePut, storageGet } from '../storage';
 import { notifyOwner } from '../_core/notification';
 import fs from 'fs';
@@ -166,6 +166,31 @@ export const nfeRouter = router({
         // Assinar XML
         const signedXml = await signXml(xmlContent, privateKeyContent, certificate.thumbprint);
 
+        // Gerar PDF/DANFSe
+        const danfsePdfHtml = generateDanfsePdf({
+          numeroLote: Date.now().toString(),
+          cnpj: config.cnpj,
+          inscricaoMunicipal: config.inscricaoMunicipal,
+          rpsNumber,
+          rpsSeries: 'RPS',
+          rpsType: '1',
+          clientName: input.clientName,
+          clientCpfCnpj: input.clientCpfCnpj.replace(/\D/g, ''),
+          clientAddress: input.clientAddress,
+          clientCity: input.clientCity,
+          clientState: input.clientState,
+          clientCep: input.clientCep,
+          serviceDescription: input.serviceDescription,
+          serviceValue: String(input.serviceValue),
+          deductions: String(input.deductions || '0'),
+          itemListaServico: config.itemListaServico,
+          codigoCnae: config.codigoCnae,
+          regimeEspecialTributacao: config.regimeEspecialTributacao || '',
+          optanteSimplesNacional: config.optanteSimplesNacional,
+          incentivadorCultural: config.incentivadorCultural,
+          emittedAt: new Date(),
+        });
+
         // Armazenar XML assinado diretamente no banco de dados
         const invoiceResult = await createInvoice({
           userId: ctx.user.id,
@@ -182,6 +207,8 @@ export const nfeRouter = router({
           observations: input.observations,
           xmlSignedUrl: signedXml.substring(0, 100), // Armazenar preview do XML
           xmlSignedStorageKey: signedXml, // Armazenar XML completo
+          pdfUrl: danfsePdfHtml.substring(0, 100), // Armazenar preview do PDF
+          pdfStorageKey: danfsePdfHtml, // Armazenar PDF completo
           emittedAt: new Date(),
         });
 

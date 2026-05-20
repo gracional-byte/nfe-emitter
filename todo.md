@@ -11,7 +11,7 @@
 - [x] Implementar função de assinatura XML com RSA-SHA256
 - [x] Implementar integração SOAP com Prefeitura de SP (estrutura preparada)
 - [x] Criar procedure para emissão de RPS
-- [ ] Criar procedure para geração de PDF/DANFSe
+- [x] Criar procedure para geração de PDF/DANFSe
 - [x] Implementar tratamento de erros e retry logic
 - [x] Adicionar logs de auditoria para cada emissão
 
@@ -82,3 +82,10 @@
 - [x] Corrigir schema CompanyConfigSchema para usar strings em vez de booleanos
 - [x] Corrigir testes de validação de chave privada
 - [x] Todos os testes passando (17 testes)
+
+## Melhorias de PDF/DANFSe (Próximas Iterações)
+- [ ] Implementar geração de PDF real (buffer/bytes) em vez de HTML string
+- [ ] Adicionar biblioteca de PDF (pdf-lib ou similar) para melhor formatação
+- [ ] Persistir PDF gerado em storage com storagePut
+- [ ] Criar procedure tRPC dedicada para recuperar PDF/DANFSe por nota fiscal
+- [ ] Adicionar testes backend para geração e recuperação de PDF

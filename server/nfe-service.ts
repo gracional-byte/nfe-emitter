@@ -32,6 +32,7 @@ interface RpsData {
   regimeEspecialTributacao: string;
   optanteSimplesNacional: string;
   incentivadorCultural: string;
+  observations?: string;
 }
 
 /**
@@ -260,4 +261,233 @@ export function validateCpfOrCnpj(value: string): boolean {
   }
   
   return false;
+}
+
+/**
+ * Gera PDF/DANFSe (Documento Auxiliar da Nota Fiscal de Serviço Eletrônica)
+ * Implementação simplificada que cria um HTML estruturado e o converte para PDF
+ */
+export function generateDanfsePdf(data: RpsData & { nfseNumber?: string; rpsNumber: string; emittedAt?: Date }): string {
+  const emittedDate = data.emittedAt ? new Date(data.emittedAt).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+  const serviceValue = parseFloat(data.serviceValue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const deductions = parseFloat(data.deductions).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const netValue = (parseFloat(data.serviceValue) - parseFloat(data.deductions)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DANFSe - Documento Auxiliar da Nota Fiscal de Serviço Eletrônica</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background-color: white;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      border: 2px solid #333;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #333;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .header p {
+      margin: 5px 0;
+      font-size: 12px;
+    }
+    .section {
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+      padding: 10px;
+    }
+    .section-title {
+      background-color: #f0f0f0;
+      padding: 8px;
+      font-weight: bold;
+      font-size: 12px;
+      margin: -10px -10px 10px -10px;
+    }
+    .row {
+      display: flex;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .col {
+      flex: 1;
+    }
+    .col-label {
+      font-weight: bold;
+      color: #333;
+      min-width: 150px;
+    }
+    .col-value {
+      color: #666;
+    }
+    .values-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    .values-table td {
+      padding: 8px;
+      border: 1px solid #ddd;
+      font-size: 12px;
+    }
+    .values-table .label {
+      font-weight: bold;
+      background-color: #f0f0f0;
+    }
+    .values-table .value {
+      text-align: right;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+      font-size: 10px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>DOCUMENTO AUXILIAR DA NOTA FISCAL DE SERVIÇO ELETRÔNICA</h1>
+      <p>DANFSe</p>
+      <p>NFS-e: ${data.nfseNumber || 'Pendente'} | RPS: ${data.rpsNumber}</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">INFORMAÇÕES DO PRESTADOR</div>
+      <div class="row">
+        <div class="col">
+          <div class="col-label">CNPJ:</div>
+          <div class="col-value">${data.cnpj}</div>
+        </div>
+        <div class="col">
+          <div class="col-label">Inscrição Municipal:</div>
+          <div class="col-value">${data.inscricaoMunicipal}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">INFORMAÇÕES DO TOMADOR</div>
+      <div class="row">
+        <div class="col">
+          <div class="col-label">Razão Social:</div>
+          <div class="col-value">${escapeHtml(data.clientName)}</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <div class="col-label">CPF/CNPJ:</div>
+          <div class="col-value">${data.clientCpfCnpj}</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <div class="col-label">Endereço:</div>
+          <div class="col-value">${escapeHtml(data.clientAddress)}</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <div class="col-label">Cidade/Estado:</div>
+          <div class="col-value">${data.clientCity}/${data.clientState} - CEP: ${data.clientCep}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">INFORMAÇÕES DO SERVIÇO</div>
+      <div class="row">
+        <div class="col">
+          <div class="col-label">Descrição:</div>
+          <div class="col-value">${escapeHtml(data.serviceDescription)}</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <div class="col-label">Item Lista Serviço:</div>
+          <div class="col-value">${data.itemListaServico}</div>
+        </div>
+        <div class="col">
+          <div class="col-label">Código CNAE:</div>
+          <div class="col-value">${data.codigoCnae}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">VALORES</div>
+      <table class="values-table">
+        <tr>
+          <td class="label">Valor dos Serviços</td>
+          <td class="value">R$ ${serviceValue}</td>
+        </tr>
+        <tr>
+          <td class="label">Deduções</td>
+          <td class="value">R$ ${deductions}</td>
+        </tr>
+        <tr>
+          <td class="label" style="font-size: 14px;">Valor Líquido</td>
+          <td class="value" style="font-size: 14px; font-weight: bold;">R$ ${netValue}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="section-title">INFORMAÇÕES ADICIONAIS</div>
+      <div class="row">
+        <div class="col">
+          <div class="col-label">Data de Emissão:</div>
+          <div class="col-value">${emittedDate}</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <div class="col-label">Observações:</div>
+          <div class="col-value">${data.observations ? escapeHtml(data.observations) : '-'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Este documento é uma representação visual da Nota Fiscal de Serviço Eletrônica.</p>
+      <p>Gerado automaticamente pelo Sistema de Emissão de RPS/NFS-e</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  return html;
+}
+
+/**
+ * Escapa caracteres especiais em HTML
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
