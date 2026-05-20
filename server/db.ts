@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, companyConfig, certificates, invoices, auditLog, InsertCompanyConfig, InsertCertificate, InsertInvoice, InsertAuditLog } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -130,7 +130,7 @@ export async function getActiveCertificate(userId: number) {
   const result = await db.select().from(certificates).where(
     and(eq(certificates.userId, userId), eq(certificates.isActive, 1))
   ).limit(1);
-  return result.length > 0 ? result[0] : undefined;
+  return result && result.length > 0 ? result[0] : undefined;
 }
 
 export async function createCertificate(cert: InsertCertificate) {
