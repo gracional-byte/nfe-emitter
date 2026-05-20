@@ -12,6 +12,8 @@ export default function InvoiceHistory() {
   const [page, setPage] = useState(1);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showXmlDialog, setShowXmlDialog] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const listInvoicesQuery = trpc.nfe.listInvoices.useQuery({ page, limit: 20 });
 
@@ -85,6 +87,38 @@ export default function InvoiceHistory() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex gap-4 mb-6">
+            <div className="flex-1">
+              <label className="text-sm font-medium">Buscar por cliente</label>
+              <input
+                type="text"
+                placeholder="Nome ou CPF/CNPJ"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-sm font-medium">Filtrar por status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="all">Todos os status</option>
+                <option value="authorized">Autorizada</option>
+                <option value="error">Erro</option>
+                <option value="pending">Pendente</option>
+                <option value="cancelled">Cancelada</option>
+              </select>
+            </div>
+          </div>
           {listInvoicesQuery.isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -104,7 +138,15 @@ export default function InvoiceHistory() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {listInvoicesQuery.data.map((invoice) => (
+                    {listInvoicesQuery.data
+                      .filter((invoice) => {
+                        const matchesSearch = searchTerm === '' || 
+                          invoice.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          invoice.clientCpfCnpj.includes(searchTerm);
+                        const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+                        return matchesSearch && matchesStatus;
+                      })
+                      .map((invoice) => (
                       <TableRow key={invoice.id}>
                         <TableCell className="font-medium">{invoice.rpsNumber}</TableCell>
                         <TableCell>

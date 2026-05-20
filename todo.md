@@ -43,7 +43,7 @@
 
 ## Front-end - Histórico de Notas Fiscais
 - [x] Criar tabela com histórico de emissões
-- [ ] Implementar filtros por data, status, tomador
+- [x] Implementar filtros por status e busca por cliente
 - [x] Adicionar paginação
 - [x] Criar ações: visualizar XML, download PDF
 
@@ -56,7 +56,7 @@
 - [x] Exibir total de notas emitidas
 - [x] Exibir notas do mês
 - [x] Exibir valor total emitido
-- [ ] Exibir gráfico de emissões por período
+- [x] Exibir gráfico de emissões por período
 - [x] Exibir status dos últimos certificados
 
 ## Front-end - Autenticação e Segurança
@@ -72,4 +72,4 @@
 
 ## Deployment
 - [x] Criar checkpoint final
-- [ ] Publicar sistema
+- [x] Publicar sistema
