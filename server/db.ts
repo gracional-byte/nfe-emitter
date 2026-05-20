@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, companyConfig, certificates, invoices, auditLog, InsertCompanyConfig, InsertCertificate, InsertInvoice, InsertAuditLog } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,116 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+/**
+ * Configuração da empresa
+ */
+export async function getCompanyConfig(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(companyConfig).where(eq(companyConfig.userId, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function upsertCompanyConfig(config: InsertCompanyConfig) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(companyConfig).values(config).onDuplicateKeyUpdate({
+    set: {
+      cnpj: config.cnpj,
+      inscricaoMunicipal: config.inscricaoMunicipal,
+      itemListaServico: config.itemListaServico,
+      codigoCnae: config.codigoCnae,
+      regimeEspecialTributacao: config.regimeEspecialTributacao,
+      optanteSimplesNacional: config.optanteSimplesNacional,
+      incentivadorCultural: config.incentivadorCultural,
+    },
+  });
+}
+
+/**
+ * Certificados digitais
+ */
+export async function getCertificatesByUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(certificates).where(eq(certificates.userId, userId));
+}
+
+export async function getActiveCertificate(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(certificates).where(
+    and(eq(certificates.userId, userId), eq(certificates.isActive, 1))
+  ).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createCertificate(cert: InsertCertificate) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(certificates).values(cert);
+}
+
+/**
+ * Notas Fiscais
+ */
+export async function getInvoicesByUser(userId: number, limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(invoices)
+    .where(eq(invoices.userId, userId))
+    .orderBy(desc(invoices.createdAt))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function getInvoiceById(invoiceId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(invoices)
+    .where(and(eq(invoices.id, invoiceId), eq(invoices.userId, userId)))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createInvoice(invoice: InsertInvoice) {
+  const db = await getDb();
+  if (!db) return;
+  const result = await db.insert(invoices).values(invoice);
+  return result;
+}
+
+export async function updateInvoice(invoiceId: number, updates: Partial<InsertInvoice>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(invoices).set(updates).where(eq(invoices.id, invoiceId));
+}
+
+export async function getInvoiceStats(userId: number) {
+  const db = await getDb();
+  if (!db) return { total: 0, thisMonth: 0, totalValue: 0 };
+  
+  const allInvoices = await db.select().from(invoices)
+    .where(and(eq(invoices.userId, userId), eq(invoices.status, 'authorized')));
+  
+  const now = new Date();
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  
+  const thisMonth = allInvoices.filter(inv => new Date(inv.createdAt) >= currentMonth);
+  const totalValue = allInvoices.reduce((sum, inv) => sum + Number(inv.serviceValue), 0);
+  
+  return {
+    total: allInvoices.length,
+    thisMonth: thisMonth.length,
+    totalValue,
+  };
+}
+
+/**
+ * Auditoria
+ */
+export async function createAuditLog(log: InsertAuditLog) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(auditLog).values(log);
+}
