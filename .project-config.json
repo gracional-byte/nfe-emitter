@@ -7,17 +7,18 @@
   ],
   "dev_command": "pnpm run dev",
   "env_vars": {
-    "DATABASE_URL": "mysql://U5kjLPKCb1sfUSN.root:6534QcZWo85MauxZhIxe@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/XKfSmMYPqoNeDji9cAzpJc?ssl={\"rejectUnauthorized\":true}"
+    "DATABASE_URL": "mysql://U5kjLPKCb1sfUSN.root:6534QcZWo85MauxZhIxe@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/XKfSmMYPqoNeDji9cAzpJc?ssl={\"rejectUnauthorized\":true}",
+    "DRIZZLE_DATABASE_URL": "mysql://U5kjLPKCb1sfUSN.root:6534QcZWo85MauxZhIxe@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/XKfSmMYPqoNeDji9cAzpJc?ssl={\"rejectUnauthorized\":true}"
   },
   "experiments": [
     "no_db_push"
   ],
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310419663029938019/XKfSmMYPqoNeDji9cAzpJc",
-    "access_key_id": "ASIAZV3A2ECZI542VZHR",
-    "secret_access_key": "hQq3sX7fc8YPAc6c3WyUNMeAR9B9+kHdeVFY2GCD",
-    "session_token": "IQoJb3JpZ2luX2VjECQaCXVzLWVhc3QtMSJIMEYCIQCUQdjF4fKSFkJ8ODX7SwuxmkwFC4ovkunttE9GweWf6wIhAKLThfeP80x3gTHTXNMjIuuc7ZPbCoyZWQ5IUYrcDlpzKv8DCO3//////////wEQBBoMNjY1Mzg2MDk4ODY2IgyDJMZ2b3IIIb6p5Zcq0wNonBtC/lFT3tODpZtZ9Quq17weyYmj0GdwOxhl+uAJWRdCDKWBroGhSSAZhGwHwJCvDYqePOQ8aNWw358BQWNqJZr6xTKOi4WDJyeTTHnYzIi2UwaPvLXKahFGQ1T9A+D/niVikG76v5SRgAp2mVTYfWbwJV90SS/r5zIKBirwQRrcbfT0hH4Cqi1VHl1ZduacWmYczklsO6Y8hHpZebDk2PqcGrjW22e3D6Snu+JSzIgRtXxtdyNVTZMRKJS8EsnQhXXGXwT6TXlW4rwnr70TThQwAMNIZYMzeOkTn8OLFZsL4vbG3P1SxRG01ELoCd/AuqWZ5JVOoHWruK+u+k1vo999G1gmRSoGaSrGSj1sZmNK9COxbCCwkhs3pWCsTEP8k8D1I2QWbHrBBMlXc0LkIVkOFPsNp0027d4XCFoKrNIxTxWrz/9FUaDSYd0UAgcQmkEU/5PU8ac14xax7K98rnnWjpsMWK6pnsjs/qvk4p2Rog5HXVPnherIOinAR3UHIIxNTOKlvlRsGFpLhOJQGMFjG+3qjLHsLQuPDBD7HNcK0Kww5nXBpb4uARn6YdZeO0immrXzLmQnL3WcsBfVm2/R/tEevEQDEqLBDWnensSfxzC+t7bQBjqcAcjniKVsWNVGC/KpAwPp33kwE/pIfr6aCsAlFEbDCMZAZiOBIlE3sd6LCC+ifoVviNbev3Heov1owdpK25oVQ6bvWSOrgxNHy+onnOZTETx906wptNYMeq7Dfx4KIYQWWnB/Vlp/SZCUv/o//6u+cggFye5QUegvtR4RINMDDeq0OYw9ufDTu9w1eiOnbVe7Cr50U9BS9wuuuM3eiw==",
-    "expiration": "2026-05-20T23:32:14.000Z"
+    "access_key_id": "ASIAZV3A2ECZFUPKJO2V",
+    "secret_access_key": "tvahNt1UWbG1eYxOVJuRS0dfcfAWa93gsjWXupd+",
+    "session_token": "IQoJb3JpZ2luX2VjECYaCXVzLWVhc3QtMSJGMEQCIGy6ad6FkX12Ix2GixnmPb+pXyr2l3E9hZ05kMF3feulAiAu4km81rZ708XS0Xcl4MNQUKxT13tRx5g0rVJtIaY2eir/Awjv//////////8BEAQaDDY2NTM4NjA5ODg2NiIMhT1ATxqFb9ngaLi3KtMDRyQJ0xQPRKJBvT5Nc+Kako5SC2vBveReUbE8wzBd1SbshNf+0cL5Th561EdSJNTnKr3yqwdGPEY6g+GkFydl8AZQx+DPG6TSwYdp+IXWxvk2nsAEhaMwKs9kJ+ta0ZyFaB6HfbbdzUhwalAz0M55mZp7xxnIHXVJ/QPHNVrf6jORz5/MGL1Y9tSXQRHjNLAaAlcZdFAM7HJpii//x0XOlp2Ll3+D/MAt6qBurSZBkStCHTuxsKlPk0XSKFw64qC0VZ9m3SE8cT9pu9DM+c5ipZVQdOcnN6rufGKAMX5NsFl5g72xZmhlAgcnw+OuqDY3+OHOiZcaaQmh7ADHYh/rbMbCYUH30KYcgqU5dSBgdBOdI4GN2vKxwy1if1CgZy0Di+JqpOsY/sLctVjYA5z82gPZaqGgBP4hC9q9Ok6jqvtCZUXZarFIO70A9yIlScXjg/4HkEc89dQ286O7JiSYoY5gvF3F6560MOcK2Vkuukq9EmOXSRJtB9WJBQ0OWfykh3qdu4Vh6xr9rPQ2Vj7LXiDX0Bqo1HK+K9Mqp04NU8m06IIueF9XFdDhpAcNqTlSp9jduyZ9S5EgHNYLbygdHbzbI78+vnmYJVqcTxYduCDUeVow4va20AY6ngHqx8NBUVbcnvhNaXviQpjXRrkNsbyrLqW2c8NZcth22Qr9anwkIg6W9LOD5sX4kIhAU8Hh2zXtApoDoi5xiz79d3RM7STWzEHa/xg4VxLOW/mj1y6RHOnGyGHkzW+aSPF3+BXAH2diKuZ8e8qf0ggU8hRxU2wCK0uOItu5A6WyJc2HtzGjrENndsTZrDVkFS8mqcULuiLVk8DEXEe41Q==",
+    "expiration": "2026-05-21T01:47:14.000Z"
   },
   "name": "nfe-emitter",
   "path": "/home/ubuntu/nfe-emitter",
@@ -29,10 +30,11 @@
     "OAUTH_SERVER_URL": "https://api.manus.im",
     "OWNER_NAME": "césar júnior Gracional",
     "OWNER_OPEN_ID": "FUBxJAg5TuMYvDGXMiKyR6",
+    "PRIVATE_KEY_PEM": "Gracional",
     "VITE_ANALYTICS_ENDPOINT": "https://manus-analytics.com",
     "VITE_ANALYTICS_WEBSITE_ID": "14f61308-9f29-4fbd-a591-b4e2ccb5623c",
     "VITE_APP_ID": "XKfSmMYPqoNeDji9cAzpJc",
-    "VITE_APP_LOGO": "",
+    "VITE_APP_LOGO": "https://files.manuscdn.com/user_upload_by_module/web_dev_logo/310419663029938019/XmlRHfsexJlsEapH.png",
     "VITE_APP_TITLE": "Sistema de Emissão de Notas Fiscais (RPS)",
     "VITE_FRONTEND_FORGE_API_KEY": "iS7dfyaWgYdDBJ7YLq9ivQ",
     "VITE_FRONTEND_FORGE_API_URL": "https://forge.manus.ai",

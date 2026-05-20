@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,8 +24,8 @@ type CompanyConfigFormData = z.infer<typeof CompanyConfigSchema>;
 
 export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
-  const getConfigQuery = trpc.nfe.getConfig.useQuery();
-  const updateConfigMutation = trpc.nfe.updateConfig.useMutation();
+  const getConfigQuery = trpc.nfe.getCompanyConfig.useQuery();
+  const updateConfigMutation = trpc.nfe.updateCompanyConfig.useMutation();
 
   const form = useForm<CompanyConfigFormData>({
     resolver: zodResolver(CompanyConfigSchema) as any,

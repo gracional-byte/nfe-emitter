@@ -33,7 +33,7 @@ type EmitRpsFormData = z.infer<typeof EmitRpsSchema>;
 export default function EmitRps() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCert, setSelectedCert] = useState<any>(null);
-  const getConfigQuery = trpc.nfe.getConfig.useQuery();
+  const getConfigQuery = trpc.nfe.getCompanyConfig.useQuery();
   const emitRpsMutation = trpc.nfe.emitRps.useMutation();
 
   const form = useForm<EmitRpsFormData>({
@@ -60,7 +60,11 @@ export default function EmitRps() {
 
     setIsLoading(true);
     try {
-      await emitRpsMutation.mutateAsync(data);
+      await emitRpsMutation.mutateAsync({
+        ...data,
+        serviceValue: parseFloat(data.serviceValue),
+        deductions: data.deductions ? parseFloat(data.deductions) : undefined,
+      });
       toast.success('RPS emitido com sucesso!');
       form.reset();
     } catch (error) {

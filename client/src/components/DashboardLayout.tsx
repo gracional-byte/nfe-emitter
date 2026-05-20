@@ -21,7 +21,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { LayoutDashboard, LogOut, PanelLeft, FileText, History, Shield, Settings as SettingsIcon } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, FileText, History, Shield, Settings as SettingsIcon, Code } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -36,6 +36,7 @@ const getMenuItems = (isAdmin: boolean) => {
     { icon: FileText, label: "Emitir RPS", path: "/emit" },
     { icon: History, label: "Histórico", path: "/history" },
     { icon: SettingsIcon, label: "Configurações", path: "/settings" },
+    { icon: Code, label: "Editor de Código", path: "/editor" },
   ];
   
   return isAdmin ? [...baseItems, ...adminItems] : baseItems;

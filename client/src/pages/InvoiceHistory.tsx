@@ -15,9 +15,9 @@ export default function InvoiceHistory() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const listInvoicesQuery = trpc.nfe.listInvoices.useQuery({ page, limit: 20 });
+  const listInvoicesQuery = trpc.nfe.getInvoices.useQuery({ limit: 20, offset: (page - 1) * 20 });
 
-  const handleDownloadXml = async (invoice: any) => {
+  const handleDownloadXml = async (invoice: any): Promise<void> => {
     if (!invoice.xmlSignedUrl) {
       toast.error('XML não disponível para download');
       return;
@@ -40,7 +40,7 @@ export default function InvoiceHistory() {
     }
   };
 
-  const handleViewXml = (invoice: any) => {
+  const handleViewXml = (invoice: any): void => {
     setSelectedInvoice(invoice);
     setShowXmlDialog(true);
   };

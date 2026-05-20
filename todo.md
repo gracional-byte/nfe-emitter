@@ -73,3 +73,12 @@
 ## Deployment
 - [x] Criar checkpoint final
 - [x] Publicar sistema (Versão: 2d58b13a)
+
+## Correções de TypeScript (Sessão Atual)
+- [x] Remover duplicação de imports de useState em EmitRps.tsx
+- [x] Remover duplicação de imports de useState em InvoiceHistory.tsx
+- [x] Remover duplicação de imports de useState/useEffect em Settings.tsx
+- [x] Adicionar import de trpc em Dashboard.tsx
+- [x] Corrigir schema CompanyConfigSchema para usar strings em vez de booleanos
+- [x] Corrigir testes de validação de chave privada
+- [x] Todos os testes passando (17 testes)
