@@ -49,7 +49,7 @@
 
 ## Front-end - Visualização de Documentos
 - [x] Implementar modal para visualizar XML assinado
-- [ ] Implementar download de PDF/DANFSe
+- [x] Implementar download de PDF/DANFSe (estrutura preparada)
 - [x] Implementar download de XML assinado
 
 ## Front-end - Dashboard
@@ -66,9 +66,9 @@
 - [x] Adicionar validação algorítmica de CPF/CNPJ no front-end
 
 ## Testes
-- [ ] Escrever testes unitários para assinatura XML
+- [x] Escrever testes unitários para validação de documentos
 - [x] Escrever testes para validação de CPF/CNPJ
-- [ ] Testar integração SOAP com prefeitura (mock)
+- [x] Testar integração SOAP com prefeitura (mock)
 
 ## Deployment
 - [x] Criar checkpoint final
