@@ -172,6 +172,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      node-forge:
+        specifier: ^1.4.0
+        version: 1.4.0
       node-nfe:
         specifier: ^1.0.24
         version: 1.0.24
@@ -4192,6 +4195,10 @@ packages:
   node-forge@0.10.0:
     resolution: {integrity: sha512-PPmu8eEeG9saEUvI97fm4OYxXVB6bFvyNTyiUOBichBpFG8A1Ljw3bY62+5oOjDEMHRnd0Y7HQ+x7uzxOzC6JA==}
     engines: {node: '>= 6.0.0'}
+
+  node-forge@1.4.0:
+    resolution: {integrity: sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==}
+    engines: {node: '>= 6.13.0'}
 
   node-nfe@1.0.24:
     resolution: {integrity: sha512-efKuc9y1NEC996VczdhvohRqM+9W6Ty124PVSqfmfVgKjiojM0xl/cK/engPbotyehvHDHKMhO0490zaVbnedQ==}
@@ -9908,6 +9915,8 @@ snapshots:
       long: 4.0.0
 
   node-forge@0.10.0: {}
+
+  node-forge@1.4.0: {}
 
   node-nfe@1.0.24:
     dependencies:

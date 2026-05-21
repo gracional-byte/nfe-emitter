@@ -11,6 +11,8 @@ export function CertificateUpload() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [certificateName, setCertificateName] = useState('');
+  const [certificatePassword, setCertificatePassword] = useState('');
+  const [fileType, setFileType] = useState<'pem' | 'pfx'>('pem');
   const certificatesQuery = trpc.nfe.getCertificates.useQuery();
   const uploadMutation = trpc.nfe.uploadCertificate.useMutation();
   const utils = trpc.useUtils();
@@ -18,10 +20,15 @@ export function CertificateUpload() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.name.endsWith('.pem')) {
-        toast.error('Por favor, selecione um arquivo .pem válido');
+      const isPem = file.name.endsWith('.pem');
+      const isPfx = file.name.endsWith('.pfx') || file.name.endsWith('.p12');
+      
+      if (!isPem && !isPfx) {
+        toast.error('Por favor, selecione um arquivo .pem ou .pfx válido');
         return;
       }
+      
+      setFileType(isPfx ? 'pfx' : 'pem');
       setSelectedFile(file);
     }
   };
@@ -32,18 +39,35 @@ export function CertificateUpload() {
       return;
     }
 
+    if (fileType === 'pfx' && !certificatePassword.trim()) {
+      toast.error('Por favor, informe a senha do certificado .pfx');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const fileContent = await selectedFile.text();
+      let fileContent: string;
+      
+      if (fileType === 'pfx') {
+        // Para .pfx, converter para Base64
+        const buffer = await selectedFile.arrayBuffer();
+        fileContent = Buffer.from(buffer).toString('base64');
+      } else {
+        // Para .pem, ler como texto
+        fileContent = await selectedFile.text();
+      }
       
       await uploadMutation.mutateAsync({
         certificateName: certificateName.trim(),
         certificateContent: fileContent,
+        certificatePassword: fileType === 'pfx' ? certificatePassword : undefined,
+        fileType,
       });
 
       toast.success('Certificado enviado com sucesso!');
       setSelectedFile(null);
       setCertificateName('');
+      setCertificatePassword('');
       
       // Refresh certificates list
       await utils.nfe.getCertificates.invalidate();
@@ -61,7 +85,7 @@ export function CertificateUpload() {
         <CardHeader>
           <CardTitle>Certificado Digital</CardTitle>
           <CardDescription>
-            Faça upload do seu certificado digital em formato .pem
+            Faça upload do seu certificado digital em formato .pem ou .pfx
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -84,11 +108,11 @@ export function CertificateUpload() {
             </div>
 
             <div>
-              <label className="text-sm font-medium">Arquivo .pem</label>
+              <label className="text-sm font-medium">Arquivo (.pem ou .pfx)</label>
               <div className="flex gap-2">
                 <Input
                   type="file"
-                  accept=".pem"
+                  accept=".pem,.pfx,.p12"
                   onChange={handleFileSelect}
                   disabled={isLoading}
                 />
@@ -100,9 +124,22 @@ export function CertificateUpload() {
               )}
             </div>
 
+            {fileType === 'pfx' && (
+              <div>
+                <label className="text-sm font-medium">Senha do Certificado .pfx</label>
+                <Input
+                  type="password"
+                  placeholder="Digite a senha do certificado"
+                  value={certificatePassword}
+                  onChange={(e) => setCertificatePassword(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
+
             <Button
               onClick={handleUpload}
-              disabled={isLoading || !selectedFile || !certificateName.trim()}
+              disabled={isLoading || !selectedFile || !certificateName.trim() || (fileType === 'pfx' && !certificatePassword.trim())}
               className="w-full"
             >
               {isLoading ? (

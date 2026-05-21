@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { protectedProcedure, router } from '../_core/trpc';
 import { TRPCError } from '@trpc/server';
+import * as forge from 'node-forge';
 import {
   getCompanyConfig,
   upsertCompanyConfig,
@@ -31,7 +32,9 @@ const CompanyConfigSchema = z.object({
 
 const CertificateUploadSchema = z.object({
   certificateName: z.string(),
-  certificateContent: z.string(),
+  certificateContent: z.string(), // Base64 do arquivo .pfx ou conteúdo PEM
+  certificatePassword: z.string().optional(), // Senha do .pfx
+  fileType: z.enum(['pfx', 'pem']).default('pem'), // Tipo de arquivo
 });
 
 const EmitDanfseSchema = z.object({
@@ -48,7 +51,50 @@ const EmitDanfseSchema = z.object({
   deductions: z.number().optional().default(0),
   discount: z.number().optional().default(0),
   observations: z.string().optional(),
+  certificateId: z.number(),
 });
+
+/**
+ * Extrair certificado e chave privada de arquivo .pfx
+ */
+async function extractCertificateFromPfx(
+  pfxBase64: string,
+  password: string
+): Promise<{ certificate: string; privateKey: string }> {
+  try {
+    // Decodificar Base64
+    const pfxBuffer = Buffer.from(pfxBase64, 'base64');
+    
+    // Carregar o .pfx
+    const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString('binary'));
+    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, password);
+
+    // Extrair certificado
+    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+    if (!certBags.certBag || certBags.certBag.length === 0) {
+      throw new Error('Nenhum certificado encontrado no arquivo .pfx');
+    }
+
+    const cert = certBags.certBag[0].cert;
+    const certificatePem = forge.pki.certificateToPem(cert);
+
+    // Extrair chave privada
+    const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+    if (!keyBags.pkcs8ShroudedKeyBag || keyBags.pkcs8ShroudedKeyBag.length === 0) {
+      throw new Error('Chave privada não encontrada no arquivo .pfx');
+    }
+
+    const key = keyBags.pkcs8ShroudedKeyBag[0].key;
+    const privateKeyPem = forge.pki.privateKeyToPem(key);
+
+    return {
+      certificate: certificatePem,
+      privateKey: privateKeyPem,
+    };
+  } catch (error: any) {
+    throw new Error(`Erro ao processar .pfx: ${error.message}`);
+  }
+}
 
 export const nfeRouter = router({
   /**
@@ -61,30 +107,10 @@ export const nfeRouter = router({
   updateCompanyConfig: protectedProcedure
     .input(CompanyConfigSchema)
     .mutation(async ({ ctx, input }) => {
-      try {
-        if (input.cnpj.length !== 14 || !/^\d+$/.test(input.cnpj)) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'CNPJ inválido',
-          });
-        }
-
-        await upsertCompanyConfig({ userId: ctx.user.id, ...input });
-
-        await createAuditLog({
-          userId: ctx.user.id,
-          action: 'update_config',
-          details: `Configurações da empresa atualizadas`,
-          ipAddress: ctx.req.ip,
-        });
-
-        return { success: true };
-      } catch (error: any) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: error?.message || 'Erro ao atualizar configurações',
-        });
-      }
+      return upsertCompanyConfig({
+        userId: ctx.user.id,
+        ...input,
+      });
     }),
 
   /**
@@ -98,40 +124,65 @@ export const nfeRouter = router({
     .input(CertificateUploadSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        // Validar certificado PEM
-        if (!input.certificateContent.includes('-----BEGIN CERTIFICATE-----')) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Certificado inválido. Deve ser um arquivo PEM válido.',
-          });
+        let certificatePem: string;
+        let privateKeyPem: string;
+
+        if (input.fileType === 'pfx') {
+          // Processar arquivo .pfx
+          if (!input.certificatePassword) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Senha do certificado .pfx é obrigatória.',
+            });
+          }
+
+          try {
+            const extracted = await extractCertificateFromPfx(
+              input.certificateContent,
+              input.certificatePassword
+            );
+            certificatePem = extracted.certificate;
+            privateKeyPem = extracted.privateKey;
+          } catch (pfxError: any) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: `Erro ao processar arquivo .pfx: ${pfxError.message}`,
+            });
+          }
+        } else {
+          // Processar arquivo PEM
+          if (!input.certificateContent.includes('-----BEGIN CERTIFICATE-----')) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Certificado inválido. Deve ser um arquivo PEM válido.',
+            });
+          }
+
+          if (!input.certificateContent.includes('-----BEGIN PRIVATE KEY-----') && 
+              !input.certificateContent.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Certificado inválido. Deve conter a chave privada.',
+            });
+          }
+
+          const certMatch = input.certificateContent.match(
+            /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/
+          );
+          const keyMatch = input.certificateContent.match(
+            /(-----BEGIN PRIVATE KEY-----[\s\S]*?-----END PRIVATE KEY-----|-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----)/
+          );
+
+          if (!certMatch || !keyMatch) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Não foi possível extrair certificado e chave privada do arquivo.',
+            });
+          }
+
+          certificatePem = certMatch[0];
+          privateKeyPem = keyMatch[0];
         }
-
-        // Validar que contém chave privada
-        if (!input.certificateContent.includes('-----BEGIN PRIVATE KEY-----') && 
-            !input.certificateContent.includes('-----BEGIN RSA PRIVATE KEY-----')) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Certificado inválido. Deve conter a chave privada.',
-          });
-        }
-
-        // Extrair certificado público e chave privada
-        const certMatch = input.certificateContent.match(
-          /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/
-        );
-        const keyMatch = input.certificateContent.match(
-          /(-----BEGIN PRIVATE KEY-----[\s\S]*?-----END PRIVATE KEY-----|-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----)/
-        );
-
-        if (!certMatch || !keyMatch) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Não foi possível extrair certificado e chave privada do arquivo.',
-          });
-        }
-
-        const certificatePem = certMatch[0];
-        const privateKeyPem = keyMatch[0];
 
         // Gerar thumbprint a partir do certificado público
         const thumbprint = generateThumbprint(certificatePem);
@@ -150,7 +201,7 @@ export const nfeRouter = router({
         await createAuditLog({
           userId: ctx.user.id,
           action: 'upload_certificate',
-          details: `Certificado ${input.certificateName} enviado`,
+          details: `Certificado ${input.certificateName} enviado (${input.fileType})`,
           ipAddress: ctx.req.ip,
         });
 
@@ -175,11 +226,28 @@ export const nfeRouter = router({
     .input(EmitDanfseSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        // Validar CPF/CNPJ do cliente
+        // Validar CPF/CNPJ
         if (!validateCpfOrCnpj(input.clientCpfCnpj)) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: 'CPF ou CNPJ do cliente inválido',
+            message: 'CPF/CNPJ do cliente inválido',
+          });
+        }
+
+        // Obter certificado
+        const certificate = await getActiveCertificate(input.certificateId);
+        if (!certificate) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Certificado não encontrado',
+          });
+        }
+
+        // Validar que certificado tem ambos os campos
+        if (!certificate.certificateContent || !certificate.certificateKeyContent) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Certificado incompleto. Faça upload de um novo certificado.',
           });
         }
 
@@ -189,23 +257,6 @@ export const nfeRouter = router({
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Configurações da empresa não encontradas. Configure os dados tributários primeiro.',
-          });
-        }
-
-        // Obter certificado ativo
-        const certificate = await getActiveCertificate(ctx.user.id);
-        if (!certificate) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Nenhum certificado digital ativo encontrado',
-          });
-        }
-
-        // Validar que certificado tem ambos os campos
-        if (!certificate.certificateContent || !certificate.certificateKeyContent) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Certificado incompleto. Faça upload de um novo certificado.',
           });
         }
 
@@ -261,65 +312,47 @@ export const nfeRouter = router({
             servicoItemLista: config.itemListaServico,
             deducoes: input.deductions || 0,
             desconto: input.discount || 0,
-            issRetido: 'N', // N = ISS não retido
-            issAliquota: input.issRate / 100, // Converter para decimal
-            dataFato: new Date().toISOString().split('T')[0],
-            observacoes: input.observations,
+            issAliquota: input.issRate / 100,
+            certificateContent: certificate.certificateContent,
+            certificateKeyContent: certificate.certificateKeyContent,
+            thumbprint: certificate.thumbprint,
           },
-          certificate.certificateKeyContent,  // Chave privada
-          certificate.certificateContent      // Certificado público
+          certificate.certificateContent,
+          certificate.certificateKeyContent
         );
 
-        if (!nfseResult.success) {
-          // Atualizar fatura com erro
-          if (invoiceId) {
-            await updateInvoice(invoiceId as number, {
-              status: 'error',
-              errorMessage: nfseResult.error || undefined,
-            });
-          }
+        // Atualizar fatura com resultado
+        if (nfseResult.success) {
+          await updateInvoice(invoiceId, {
+            status: 'authorized',
+            nfseNumber: nfseResult.nfseNumber,
+            protocolNumber: nfseResult.protocol,
+            emittedAt: new Date(),
+          });
 
           await notifyOwner({
-            title: 'Erro na Emissão de DANFE-Se',
-            content: `Erro ao emitir DANFE-Se para ${input.clientName}: ${nfseResult.error}`,
+            title: 'DANFE-Se Emitida com Sucesso',
+            content: `NFS-e ${nfseResult.nfseNumber} emitida para ${input.clientName}`,
+          });
+
+          return {
+            success: true,
+            invoiceId,
+            nfseNumber: nfseResult.nfseNumber,
+            protocolNumber: nfseResult.protocol,
+          };
+        } else {
+          await updateInvoice(invoiceId, {
+            status: 'error',
+            errorMessage: nfseResult.error,
           });
 
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: `Falha ao emitir DANFE-Se: ${nfseResult.error}`,
+            message: `Erro ao emitir DANFE-Se: ${nfseResult.error}`,
           });
         }
-
-        // Atualizar fatura com sucesso
-        if (invoiceId) {
-          await updateInvoice(invoiceId as number, {
-            status: 'authorized',
-            nfseNumber: nfseResult.nfseNumber || undefined,
-            protocolNumber: nfseResult.protocol || undefined,
-            emittedAt: new Date(),
-          });
-        }
-
-        await createAuditLog({
-          userId: ctx.user.id,
-          action: 'emit_danfse',
-          details: `DANFE-Se emitida: ${nfseResult.nfseNumber}`,
-          ipAddress: ctx.req.ip,
-        });
-
-        await notifyOwner({
-          title: 'DANFE-Se Emitida com Sucesso',
-          content: `DANFE-Se #${nfseResult.nfseNumber} emitida para ${input.clientName}`,
-        });
-
-        return {
-          success: true,
-          invoiceId: invoiceId || 0,
-          nfseNumber: nfseResult.nfseNumber,
-          protocolNumber: nfseResult.protocol,
-        };
       } catch (error: any) {
-        console.error('[NFe Router] Erro ao emitir DANFE-Se:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: error?.message || 'Erro ao emitir DANFE-Se',
@@ -334,7 +367,7 @@ export const nfeRouter = router({
     return getInvoicesByUser(ctx.user.id);
   }),
 
-  getStats: protectedProcedure.query(async ({ ctx }) => {
+  getInvoiceStats: protectedProcedure.query(async ({ ctx }) => {
     return getInvoiceStats(ctx.user.id);
   }),
 });
