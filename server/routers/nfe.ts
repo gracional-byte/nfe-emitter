@@ -36,6 +36,7 @@ const CertificateUploadSchema = z.object({
   certificateContent: z.string(), // Base64 do arquivo .pfx ou conteúdo PEM
   certificatePassword: z.string().optional(), // Senha do .pfx
   fileType: z.enum(['pfx', 'pem']).default('pem'), // Tipo de arquivo
+  privateKey: z.string().optional(), // Chave privada em PEM (quando upload separado)
 });
 
 const EmitDanfseSchema = z.object({
@@ -178,30 +179,44 @@ export const nfeRouter = router({
             });
           }
 
-          if (!input.certificateContent.includes('-----BEGIN PRIVATE KEY-----') && 
-              !input.certificateContent.includes('-----BEGIN RSA PRIVATE KEY-----')) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Certificado inválido. Deve conter a chave privada.',
-            });
+          // Se privateKey foi enviado separadamente
+          if (input.privateKey) {
+            if (!input.privateKey.includes('-----BEGIN PRIVATE KEY-----') && 
+                !input.privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Chave privada inválida. Deve ser um arquivo PEM válido.',
+              });
+            }
+            certificatePem = input.certificateContent;
+            privateKeyPem = input.privateKey;
+          } else {
+            // Tentar extrair ambos do mesmo arquivo
+            if (!input.certificateContent.includes('-----BEGIN PRIVATE KEY-----') && 
+                !input.certificateContent.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Certificado inválido. Deve conter a chave privada ou envie a chave separadamente.',
+              });
+            }
+
+            const certMatch = input.certificateContent.match(
+              /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/
+            );
+            const keyMatch = input.certificateContent.match(
+              /(-----BEGIN PRIVATE KEY-----[\s\S]*?-----END PRIVATE KEY-----|-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----)/
+            );
+
+            if (!certMatch || !keyMatch) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Não foi possível extrair certificado e chave privada do arquivo.',
+              });
+            }
+
+            certificatePem = certMatch[0];
+            privateKeyPem = keyMatch[0];
           }
-
-          const certMatch = input.certificateContent.match(
-            /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/
-          );
-          const keyMatch = input.certificateContent.match(
-            /(-----BEGIN PRIVATE KEY-----[\s\S]*?-----END PRIVATE KEY-----|-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----)/
-          );
-
-          if (!certMatch || !keyMatch) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Não foi possível extrair certificado e chave privada do arquivo.',
-            });
-          }
-
-          certificatePem = certMatch[0];
-          privateKeyPem = keyMatch[0];
         }
 
         // Gerar thumbprint a partir do certificado público
