@@ -9,8 +9,11 @@ import { signXml } from './xml-signer';
 
 // URLs da Prefeitura de São Paulo para NFS-e
 // Documentação: https://notadomilhao.sf.prefeitura.sp.gov.br/desenvolvedor/
-const PREFEITURA_WSDL_PROD = 'https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx'; // URL corrigida
-const PREFEITURA_WSDL_TEST = 'https://homolog.prefeitura.sp.gov.br/ws/lotenfe.asmx?wsdl'; // Sem acento
+// URLs da Prefeitura de SP - mesma URL para homolog e prod, diferença está no XML e credenciamento
+const PREFEITURA_WSDL_URL = 'https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx?WSDL';
+const SOAP_ACTION_ENVIAR = 'http://www.prefeitura.sp.gov.br/nfe/wsdl/RecepcionarLoteRps';
+const SOAP_ACTION_CONSULTA = 'http://www.prefeitura.sp.gov.br/nfe/wsdl/ConsultaLote';
+const SOAP_ACTION_CONSULTA_NFE = 'http://www.prefeitura.sp.gov.br/nfe/wsdl/ConsultaNFe';
 
 interface RpsData {
   numero: number;
@@ -42,19 +45,13 @@ interface RpsData {
 
 export class PrefeituraSoapClient {
   private soapClient: any;
-  private isProduction: boolean;
-
-  constructor(isProduction: boolean = false) {
-    this.isProduction = isProduction;
-  }
 
   /**
    * Inicializa o cliente SOAP
    */
   async initialize(): Promise<void> {
     try {
-      const wsdlUrl = this.isProduction ? PREFEITURA_WSDL_PROD : PREFEITURA_WSDL_TEST;
-      this.soapClient = await soap.createClientAsync(wsdlUrl, {
+      this.soapClient = await soap.createClientAsync(PREFEITURA_WSDL_URL, {
         disableCache: true,
       });
     } catch (error: any) {
@@ -248,11 +245,20 @@ export class PrefeituraSoapClient {
     return new Promise((resolve, reject) => {
       const method = this.soapClient[methodName];
       if (!method) {
-        reject(new Error(`Método SOAP ${methodName} não encontrado`));
+        reject(new Error(`Metodo SOAP ${methodName} nao encontrado`));
         return;
       }
 
-      method(params, (err: any, result: any) => {
+      const soapAction = methodName === 'EnviarRps' ? SOAP_ACTION_ENVIAR :
+                         methodName === 'ConsultarNfse' ? SOAP_ACTION_CONSULTA_NFE :
+                         SOAP_ACTION_CONSULTA;
+      
+      const options = {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': soapAction,
+      };
+
+      method(params, options, (err: any, result: any) => {
         if (err) {
           reject(err);
         } else {

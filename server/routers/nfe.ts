@@ -357,7 +357,7 @@ export const nfeRouter = router({
         console.log('[NFe Router] Fatura criada:', invoiceId);
 
         // Emitir DANFE-Se via WebService da Prefeitura
-        const soapClient = new PrefeituraSoapClient(true); // true = ambiente de produção
+        const soapClient = new PrefeituraSoapClient(); // Conectar ao webservice da Prefeitura SPção
         
         const nfseResult = await soapClient.enviarRps(
           {
