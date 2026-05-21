@@ -121,3 +121,16 @@
 - [ ] Atualizar formulário para campos DANFE-Se
 - [ ] Testar assinatura digital com certificado real
 - [ ] Testar integração com API da Prefeitura
+
+
+## Migração para node-nfe (Sessão Atual)
+- [x] Instalar biblioteca node-nfe
+- [x] Criar serviço de emissão DANFE-Se (nfse-service.ts)
+- [x] Reescrever procedures tRPC para usar node-nfe
+- [x] Atualizar UI para usar novas procedures
+- [x] Adicionar campo clientBairro ao formulário
+- [x] Corrigir todos os erros de TypeScript
+- [ ] Testar emissão com node-nfe
+- [ ] Integrar com WebService SOAP da Prefeitura SP
+- [ ] Testar com certificado real
+- [ ] Validar resposta da Prefeitura

@@ -17,6 +17,7 @@ import { emitNfse, consultarNfse, cancelarNfse } from '../nfse-service';
 import { storagePut, storageGet } from '../storage';
 import { notifyOwner } from '../_core/notification';
 import { validateCpfOrCnpj, generateThumbprint } from '../nfe-service';
+import { PrefeituraSoapClient } from '../prefeitura-soap-client';
 
 const CompanyConfigSchema = z.object({
   cnpj: z.string().min(14).max(14),
