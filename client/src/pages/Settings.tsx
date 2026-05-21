@@ -90,7 +90,7 @@ function Settings() {
         <CardHeader>
           <CardTitle>Dados Tributários</CardTitle>
           <CardDescription>
-            Estes dados serão pré-preenchidos em cada emissão de RPS
+            Estes dados serão pré-preenchidos em cada emissão de DANFE-Se
           </CardDescription>
         </CardHeader>
         <CardContent>

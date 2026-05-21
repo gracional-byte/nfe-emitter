@@ -10,7 +10,7 @@ import { trpc } from '@/lib/trpc';
 const FILES_AVAILABLE = [
   { path: 'server/routers/nfe.ts', label: 'Routers NFe' },
   { path: 'server/nfe-service.ts', label: 'Serviço NFe' },
-  { path: 'client/src/pages/EmitRps.tsx', label: 'Página Emitir RPS' },
+  { path: 'client/src/pages/EmitRps.tsx', label: 'Página Emitir DANFE-Se' },
   { path: 'client/src/pages/Dashboard.tsx', label: 'Dashboard' },
 ];
 

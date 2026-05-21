@@ -29,7 +29,7 @@ export default function InvoiceHistory() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `RPS_${invoice.rpsNumber}.xml`;
+      a.download = `DANFE-Se_${invoice.rpsNumber}.xml`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -83,7 +83,7 @@ export default function InvoiceHistory() {
         <CardHeader>
           <CardTitle>Notas Fiscais Emitidas</CardTitle>
           <CardDescription>
-            Lista completa de RPS/NFS-e emitidas
+            Lista completa de DANFE-Se emitidas
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -129,7 +129,7 @@ export default function InvoiceHistory() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>RPS</TableHead>
+                      <TableHead>DANFE-Se</TableHead>
                       <TableHead>Cliente</TableHead>
                       <TableHead>Valor</TableHead>
                       <TableHead>Status</TableHead>
@@ -224,7 +224,7 @@ export default function InvoiceHistory() {
       <Dialog open={showXmlDialog} onOpenChange={setShowXmlDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>XML Assinado - RPS {selectedInvoice?.rpsNumber}</DialogTitle>
+            <DialogTitle>XML Assinado - DANFE-Se {selectedInvoice?.rpsNumber}</DialogTitle>
             <DialogDescription>
               Visualização do XML assinado digitalmente
             </DialogDescription>

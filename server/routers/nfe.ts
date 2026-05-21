@@ -19,6 +19,7 @@ import { storagePut, storageGet } from '../storage';
 import { notifyOwner } from '../_core/notification';
 import { validateCpfOrCnpj, generateThumbprint } from '../nfe-service';
 import { PrefeituraSoapClient } from '../prefeitura-soap-client';
+import { extractCertificateInfo } from '../certificate-utils';
 
 const CompanyConfigSchema = z.object({
   cnpj: z.string().min(14).max(14),
@@ -186,6 +187,9 @@ export const nfeRouter = router({
 
         // Gerar thumbprint a partir do certificado público
         const thumbprint = generateThumbprint(certificatePem);
+        
+        // Extrair informações do certificado (CNPJ, etc)
+        const certInfo = extractCertificateInfo(certificatePem);
 
         // Criar certificado com ambos (público e privado)
         const certificate = await createCertificate({
@@ -210,7 +214,11 @@ export const nfeRouter = router({
           content: `Certificado ${input.certificateName} foi enviado com sucesso`,
         });
 
-        return { success: true, certificate };
+        return { 
+          success: true, 
+          certificate,
+          extractedCnpj: certInfo.cnpj,
+        };
       } catch (error: any) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

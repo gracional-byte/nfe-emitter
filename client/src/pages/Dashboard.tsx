@@ -1,10 +1,12 @@
-import { trpc } from '@/lib/trpc';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, FileText, TrendingUp, DollarSign } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { trpc } from '@/lib/trpc';
 
 export default function Dashboard() {
-  const statsQuery = trpc.nfe.getStats.useQuery();
+  const statsQuery = trpc.nfe.getInvoiceStats.useQuery();
+  const invoicesQuery = trpc.nfe.getInvoices.useQuery();
   const configQuery = trpc.nfe.getCompanyConfig.useQuery();
 
   if (statsQuery.isLoading || configQuery.isLoading) {
@@ -17,13 +19,37 @@ export default function Dashboard() {
 
   const stats = statsQuery.data || { total: 0, thisMonth: 0, totalValue: 0 };
   const config = configQuery.data;
+  const invoices = invoicesQuery.data || [];
+
+  // Gerar dados dos últimos 7 dias com dados reais
+  const chartData = useMemo(() => {
+    const today = new Date();
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(today);
+      date.setDate(date.getDate() - (6 - i));
+      return date;
+    });
+
+    return last7Days.map((date) => {
+      const dateStr = date.toISOString().split('T')[0];
+      const count = invoices.filter((inv) => {
+        const invDate = new Date(inv.serviceDate).toISOString().split('T')[0];
+        return invDate === dateStr;
+      }).length;
+
+      return {
+        date: date.toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' }),
+        notas: count,
+      };
+    });
+  }, [invoices]);
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground mt-2">
-          Resumo das emissões de notas fiscais
+          Resumo das emissões de DANFE-Se
         </p>
       </div>
 
@@ -36,7 +62,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Notas fiscais autorizadas
+              DANFE-Se autorizadas
             </p>
           </CardContent>
         </Card>
@@ -49,7 +75,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.thisMonth}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Notas emitidas este mês
+              DANFE-Se emitidas este mês
             </p>
           </CardContent>
         </Card>
@@ -61,7 +87,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              R$ {stats.totalValue.toFixed(2)}
+              R$ {(stats.totalValue || 0).toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Valor total emitido
@@ -79,21 +105,13 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={[
-              { date: '1', notas: 2 },
-              { date: '2', notas: 3 },
-              { date: '3', notas: 2 },
-              { date: '4', notas: 5 },
-              { date: '5', notas: 4 },
-              { date: '6', notas: 6 },
-              { date: '7', notas: 3 },
-            ]}>
+            <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="notas" stroke="#3b82f6" name="Notas Emitidas" />
+              <Line type="monotone" dataKey="notas" stroke="#3b82f6" name="DANFE-Se Emitidas" />
             </LineChart>
           </ResponsiveContainer>
         </CardContent>

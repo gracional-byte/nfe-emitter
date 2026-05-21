@@ -15,6 +15,7 @@ export function CertificateUpload() {
   const [fileType, setFileType] = useState<'pem' | 'pfx'>('pem');
   const certificatesQuery = trpc.nfe.getCertificates.useQuery();
   const uploadMutation = trpc.nfe.uploadCertificate.useMutation();
+  const updateConfigMutation = trpc.nfe.updateCompanyConfig.useMutation();
   const utils = trpc.useUtils();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,7 +58,7 @@ export function CertificateUpload() {
         fileContent = await selectedFile.text();
       }
       
-      await uploadMutation.mutateAsync({
+      const result = await uploadMutation.mutateAsync({
         certificateName: certificateName.trim(),
         certificateContent: fileContent,
         certificatePassword: fileType === 'pfx' ? certificatePassword : undefined,
@@ -65,6 +66,25 @@ export function CertificateUpload() {
       });
 
       toast.success('Certificado enviado com sucesso!');
+      
+      // Se extraiu CNPJ, preencher automaticamente
+      if (result.extractedCnpj) {
+        try {
+          const config = await trpc.nfe.getCompanyConfig.useQuery().data;
+          if (config) {
+            await updateConfigMutation.mutateAsync({
+              cnpj: result.extractedCnpj,
+              inscricaoMunicipal: config.inscricaoMunicipal || '',
+              itemListaServico: config.itemListaServico || '',
+              codigoCnae: config.codigoCnae || '',
+            });
+            toast.success(`CNPJ preenchido automaticamente: ${result.extractedCnpj}`);
+          }
+        } catch (error) {
+          console.log('CNPJ extraído:', result.extractedCnpj, '- Configure manualmente se necessário');
+        }
+      }
+      
       setSelectedFile(null);
       setCertificateName('');
       setCertificatePassword('');
