@@ -79,45 +79,44 @@ export const nfeRouter = router({
         });
 
         return { success: true };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao atualizar configurações';
+      } catch (error: any) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message,
+          message: error?.message || 'Erro ao atualizar configurações',
         });
       }
     }),
 
   /**
-   * Listar certificados do usuário
+   * Certificados digitais
    */
   getCertificates: protectedProcedure.query(async ({ ctx }) => {
     return getCertificatesByUser(ctx.user.id);
   }),
 
-  /**
-   * Upload de certificado digital
-   */
   uploadCertificate: protectedProcedure
     .input(CertificateUploadSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        if (!input.certificateContent.includes('-----BEGIN') || !input.certificateContent.includes('-----END')) {
+        // Validar certificado PEM
+        if (!input.certificateContent.includes('-----BEGIN CERTIFICATE-----')) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: 'Arquivo inválido. Por favor, envie um certificado em formato PEM',
+            message: 'Certificado inválido. Deve ser um arquivo PEM válido.',
           });
         }
 
-        const thumbprint = generateThumbprint(input.certificateName);
+        // Gerar thumbprint
+        const thumbprint = generateThumbprint(input.certificateContent);
 
-        await createCertificate({
+        // Criar certificado
+        const certificate = await createCertificate({
           userId: ctx.user.id,
           certificateName: input.certificateName,
           certificateKeyContent: input.certificateContent,
           thumbprint,
           isActive: 1,
-          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 ano
         });
 
         await createAuditLog({
@@ -128,16 +127,15 @@ export const nfeRouter = router({
         });
 
         await notifyOwner({
-          title: 'Novo Certificado Digital',
-          content: `Um novo certificado digital foi enviado: ${input.certificateName}`,
+          title: 'Certificado Digital Enviado',
+          content: `Certificado ${input.certificateName} foi enviado com sucesso`,
         });
 
-        return { success: true, message: 'Certificado enviado com sucesso' };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao enviar certificado';
+        return { success: true, certificate };
+      } catch (error: any) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message,
+          message: error?.message || 'Erro ao fazer upload do certificado',
         });
       }
     }),
@@ -176,7 +174,7 @@ export const nfeRouter = router({
         }
 
         // Criar registro de fatura
-        const invoice = await createInvoice({
+        const invoiceResult: any = await createInvoice({
           userId: ctx.user.id,
           certificateId: certificate.id,
           rpsNumber: Math.floor(Date.now() / 1000).toString(),
@@ -198,41 +196,48 @@ export const nfeRouter = router({
           serviceDate: new Date(),
         });
 
-        console.log('[NFe Router] Fatura criada:', invoice);
+        const invoiceId = invoiceResult?.id || (Array.isArray(invoiceResult) ? invoiceResult[0]?.id : undefined);
 
-        // Emitir DANFE-Se
-        const nfseResult = await emitNfse({
-          prestadorCnpj: config.cnpj,
-          prestadorInscricaoMunicipal: config.inscricaoMunicipal,
-          prestadorRazaoSocial: 'Empresa Prestadora',
-          prestadorLogradouro: 'Rua Exemplo',
-          prestadorNumero: '123',
-          prestadorBairro: 'Bairro',
-          prestadorCidade: 'São Paulo',
-          prestadorEstado: 'SP',
-          prestadorCep: '01310100',
-          tomadorCpfCnpj: input.clientCpfCnpj,
-          tomadorRazaoSocial: input.clientName,
-          tomadorLogradouro: input.clientAddress,
-          tomadorNumero: '1',
-          tomadorBairro: input.clientBairro,
-          tomadorCidade: input.clientCity,
-          tomadorEstado: input.clientState,
-          tomadorCep: input.clientCep,
-          servicoDescricao: input.serviceDescription,
-          servicoValor: input.serviceValue,
-          servicoAliquotaIss: input.issRate,
-          servicoItemLista: config.itemListaServico,
-          deducoes: input.deductions,
-          desconto: input.discount,
-          observacoes: input.observations,
-          certificateContent: certificate.certificateKeyContent || '',
-        });
+        console.log('[NFe Router] Fatura criada:', invoiceId);
+
+        // Emitir DANFE-Se via WebService da Prefeitura
+        const soapClient = new PrefeituraSoapClient(false); // false = ambiente de teste
+        
+        const nfseResult = await soapClient.enviarRps(
+          {
+            numero: Math.floor(Date.now() / 1000),
+            serie: 'RPS',
+            tipo: 1, // 1 = RPS Normal
+            dataEmissao: new Date().toISOString().split('T')[0],
+            statusRps: 'N', // N = Normal
+            prestadorCnpj: config.cnpj,
+            prestadorInscricaoMunicipal: config.inscricaoMunicipal,
+            tomadorCpfCnpj: input.clientCpfCnpj.replace(/\D/g, ''),
+            tomadorRazaoSocial: input.clientName,
+            tomadorLogradouro: input.clientAddress,
+            tomadorNumero: '1',
+            tomadorBairro: input.clientBairro,
+            tomadorCidade: input.clientCity,
+            tomadorEstado: input.clientState,
+            tomadorCep: input.clientCep,
+            servicoDescricao: input.serviceDescription,
+            servicoValor: input.serviceValue,
+            servicoItemLista: config.itemListaServico,
+            deducoes: input.deductions || 0,
+            desconto: input.discount || 0,
+            issRetido: 'N', // N = ISS não retido
+            issAliquota: input.issRate / 100, // Converter para decimal
+            dataFato: new Date().toISOString().split('T')[0],
+            observacoes: input.observations,
+          },
+          certificate.certificateKeyContent || '',
+          certificate.certificateKeyContent || ''
+        );
 
         if (!nfseResult.success) {
           // Atualizar fatura com erro
-          if (invoice) {
-            await updateInvoice(invoice[0].insertId as number, {
+          if (invoiceId) {
+            await updateInvoice(invoiceId as number, {
               status: 'error',
               errorMessage: nfseResult.error || undefined,
             });
@@ -250,11 +255,11 @@ export const nfeRouter = router({
         }
 
         // Atualizar fatura com sucesso
-        if (invoice) {
-          await updateInvoice(invoice[0].insertId as number, {
+        if (invoiceId) {
+          await updateInvoice(invoiceId as number, {
             status: 'authorized',
             nfseNumber: nfseResult.nfseNumber || undefined,
-            protocolNumber: nfseResult.protocolNumber || undefined,
+            protocolNumber: nfseResult.protocol || undefined,
             emittedAt: new Date(),
           });
         }
@@ -273,30 +278,26 @@ export const nfeRouter = router({
 
         return {
           success: true,
-          invoiceId: invoice ? (invoice[0].insertId as number) : 0,
+          invoiceId: invoiceId || 0,
           nfseNumber: nfseResult.nfseNumber,
-          protocolNumber: nfseResult.protocolNumber,
+          protocolNumber: nfseResult.protocol,
         };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao emitir DANFE-Se';
-        console.error('[NFe Router] Erro:', message);
+      } catch (error: any) {
+        console.error('[NFe Router] Erro ao emitir DANFE-Se:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message,
+          message: error?.message || 'Erro ao emitir DANFE-Se',
         });
       }
     }),
 
   /**
-   * Listar histórico de emissões
+   * Histórico de notas fiscais
    */
   getInvoices: protectedProcedure.query(async ({ ctx }) => {
     return getInvoicesByUser(ctx.user.id);
   }),
 
-  /**
-   * Obter estatísticas de emissões
-   */
   getStats: protectedProcedure.query(async ({ ctx }) => {
     return getInvoiceStats(ctx.user.id);
   }),
