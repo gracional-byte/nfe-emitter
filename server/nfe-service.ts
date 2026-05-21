@@ -124,8 +124,9 @@ export async function signXml(
       
       const sig = new SignedXml();
       
-      // Usar a chave privada do crypto
-      (sig as any).signingKey = privateKey.export({ format: 'pem', type: 'pkcs8' });
+      // Usar a chave privada no formato PKCS#1 (RSA PRIVATE KEY)
+      // que é o esperado pela Prefeitura de SP
+      (sig as any).signingKey = cleanedKey;
       
       // Configurar algoritmos de assinatura
       sig.signatureAlgorithm = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
