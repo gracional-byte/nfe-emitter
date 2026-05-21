@@ -66,28 +66,38 @@ export type Certificate = typeof certificates.$inferSelect;
 export type InsertCertificate = typeof certificates.$inferInsert;
 
 /**
- * Notas Fiscais Eletrônicas (RPS/NFS-e)
+ * Notas Fiscais de Serviço Eletrônicas (DANFE-Se / NFS-e)
+ * Integração com Prefeitura de São Paulo
  */
 export const invoices = mysqlTable("invoices", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id),
   certificateId: int("certificateId").notNull().references(() => certificates.id),
+  nfseNumber: varchar("nfseNumber", { length: 20 }),
+  nfseSeriesNumber: varchar("nfseSeriesNumber", { length: 5 }).default("1").notNull(),
   rpsNumber: varchar("rpsNumber", { length: 20 }).notNull(),
   rpsSeriesNumber: varchar("rpsSeriesNumber", { length: 5 }).default("RPS").notNull(),
-  nfseNumber: varchar("nfseNumber", { length: 20 }),
-  status: mysqlEnum("status", ["pending", "authorized", "error", "cancelled"]).default("pending").notNull(),
+  status: mysqlEnum("status", ["pending", "authorized", "error", "cancelled", "processing"]).default("pending").notNull(),
   errorMessage: text("errorMessage"),
+  protocolNumber: varchar("protocolNumber", { length: 50 }),
   clientName: varchar("clientName", { length: 255 }).notNull(),
   clientCpfCnpj: varchar("clientCpfCnpj", { length: 18 }).notNull(),
   clientAddress: text("clientAddress").notNull(),
+  clientCity: varchar("clientCity", { length: 100 }),
+  clientState: varchar("clientState", { length: 2 }),
+  clientZipCode: varchar("clientZipCode", { length: 10 }),
   serviceDescription: text("serviceDescription").notNull(),
   serviceValue: decimal("serviceValue", { precision: 12, scale: 2 }).notNull(),
   deductions: decimal("deductions", { precision: 12, scale: 2 }).default("0.00"),
+  discountValue: decimal("discountValue", { precision: 12, scale: 2 }).default("0.00"),
   observations: text("observations"),
+  issValue: decimal("issValue", { precision: 12, scale: 2 }).default("0.00"),
+  issRate: decimal("issRate", { precision: 5, scale: 2 }).default("0.00"),
   xmlSignedUrl: text("xmlSignedUrl"),
   xmlSignedStorageKey: varchar("xmlSignedStorageKey", { length: 255 }),
   pdfUrl: text("pdfUrl"),
   pdfStorageKey: varchar("pdfStorageKey", { length: 255 }),
+  serviceDate: timestamp("serviceDate"),
   emittedAt: timestamp("emittedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
