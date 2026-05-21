@@ -395,7 +395,7 @@ export const nfeRouter = router({
           await updateInvoice(invoiceId, {
             status: 'authorized',
             nfseNumber: nfseResult.nfseNumber,
-            protocolNumber: nfseResult.protocol,
+            protocolNumber: nfseResult.protocol || '',
             emittedAt: new Date(),
           });
 
@@ -408,7 +408,7 @@ export const nfeRouter = router({
             success: true,
             invoiceId,
             nfseNumber: nfseResult.nfseNumber,
-            protocolNumber: nfseResult.protocol,
+            protocol: nfseResult.protocol || '',
           };
         } else {
           await updateInvoice(invoiceId, {
