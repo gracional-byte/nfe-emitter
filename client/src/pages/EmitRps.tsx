@@ -14,7 +14,6 @@ import { Loader2, Send, AlertCircle } from 'lucide-react';
 import { isValidCPFOrCNPJ } from '@/lib/validation';
 import { CertificateSelector } from '@/components/CertificateSelector';
 
-
 const EmitRpsSchema = z.object({
   clientName: z.string().min(1, 'Nome do cliente obrigatório'),
   clientCpfCnpj: z.string().min(11, 'CPF ou CNPJ inválido').refine(isValidCPFOrCNPJ, 'CPF ou CNPJ inválido'),
@@ -22,6 +21,7 @@ const EmitRpsSchema = z.object({
   clientCity: z.string(),
   clientState: z.string(),
   clientCep: z.string(),
+  clientBairro: z.string().min(1, 'Bairro obrigatório'),
   serviceDescription: z.string().min(1, 'Descrição do serviço obrigatória'),
   serviceValue: z.string().min(1, 'Valor obrigatório'),
   deductions: z.string(),
@@ -34,7 +34,7 @@ export default function EmitRps() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCert, setSelectedCert] = useState<any>(null);
   const getConfigQuery = trpc.nfe.getCompanyConfig.useQuery();
-  const emitRpsMutation = trpc.nfe.emitRps.useMutation();
+  const emitDanfseMutation = trpc.nfe.emitDanfse.useMutation();
 
   const form = useForm<EmitRpsFormData>({
     resolver: zodResolver(EmitRpsSchema),
@@ -60,7 +60,7 @@ export default function EmitRps() {
 
     setIsLoading(true);
     try {
-      await emitRpsMutation.mutateAsync({
+      await emitDanfseMutation.mutateAsync({
         ...data,
         serviceValue: parseFloat(data.serviceValue),
         deductions: data.deductions ? parseFloat(data.deductions) : undefined,

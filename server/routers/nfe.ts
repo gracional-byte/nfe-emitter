@@ -11,12 +11,12 @@ import {
   getInvoicesByUser,
   getInvoiceStats,
   createAuditLog,
+  updateInvoice,
 } from '../db';
-import { signXml, generateRpsXml, validateCpfOrCnpj, validatePrivateKey, generateThumbprint, generateDanfsePdf } from '../nfe-service';
+import { emitNfse, consultarNfse, cancelarNfse } from '../nfse-service';
 import { storagePut, storageGet } from '../storage';
 import { notifyOwner } from '../_core/notification';
-import fs from 'fs';
-import path from 'path';
+import { validateCpfOrCnpj, generateThumbprint } from '../nfe-service';
 
 const CompanyConfigSchema = z.object({
   cnpj: z.string().min(14).max(14),
@@ -33,16 +33,19 @@ const CertificateUploadSchema = z.object({
   certificateContent: z.string(),
 });
 
-const EmitRpsSchema = z.object({
+const EmitDanfseSchema = z.object({
   clientName: z.string(),
   clientCpfCnpj: z.string(),
   clientAddress: z.string(),
   clientCity: z.string(),
   clientState: z.string(),
   clientCep: z.string(),
+  clientBairro: z.string(),
   serviceDescription: z.string(),
-  serviceValue: z.number(),
-  deductions: z.number().optional(),
+  serviceValue: z.number().positive(),
+  issRate: z.number().default(5),
+  deductions: z.number().optional().default(0),
+  discount: z.number().optional().default(0),
   observations: z.string().optional(),
 });
 
@@ -58,7 +61,6 @@ export const nfeRouter = router({
     .input(CompanyConfigSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        // Validar CNPJ
         if (input.cnpj.length !== 14 || !/^\d+$/.test(input.cnpj)) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -99,7 +101,6 @@ export const nfeRouter = router({
     .input(CertificateUploadSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        // Validar certificado PEM
         if (!input.certificateContent.includes('-----BEGIN') || !input.certificateContent.includes('-----END')) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -107,17 +108,15 @@ export const nfeRouter = router({
           });
         }
 
-        // Gerar thumbprint
         const thumbprint = generateThumbprint(input.certificateName);
 
-        // Criar certificado
         await createCertificate({
           userId: ctx.user.id,
           certificateName: input.certificateName,
           certificateKeyContent: input.certificateContent,
           thumbprint,
           isActive: 1,
-          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 ano
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         });
 
         await createAuditLog({
@@ -143,10 +142,10 @@ export const nfeRouter = router({
     }),
 
   /**
-   * Emissão de RPS
+   * Emissão de DANFE-Se (NFS-e)
    */
-  emitRps: protectedProcedure
-    .input(EmitRpsSchema)
+  emitDanfse: protectedProcedure
+    .input(EmitDanfseSchema)
     .mutation(async ({ ctx, input }) => {
       try {
         // Validar CPF/CNPJ do cliente
@@ -175,127 +174,111 @@ export const nfeRouter = router({
           });
         }
 
-        // Gerar número do RPS
-        const rpsNumber = Math.floor(Date.now() / 1000).toString();
-
-        // Gerar XML do RPS
-        const xmlContent = generateRpsXml({
-          numeroLote: Date.now().toString(),
-          cnpj: config.cnpj,
-          inscricaoMunicipal: config.inscricaoMunicipal,
-          rpsNumber,
-          rpsSeries: 'RPS',
-          rpsType: '1',
+        // Criar registro de fatura
+        const invoice = await createInvoice({
+          userId: ctx.user.id,
+          certificateId: certificate.id,
+          rpsNumber: Math.floor(Date.now() / 1000).toString(),
+          rpsSeriesNumber: 'RPS',
+          status: 'processing',
           clientName: input.clientName,
           clientCpfCnpj: input.clientCpfCnpj.replace(/\D/g, ''),
           clientAddress: input.clientAddress,
           clientCity: input.clientCity,
           clientState: input.clientState,
-          clientCep: input.clientCep,
+          clientZipCode: input.clientCep,
           serviceDescription: input.serviceDescription,
-          serviceValue: String(input.serviceValue),
-          deductions: String(input.deductions || '0'),
-          itemListaServico: config.itemListaServico,
-          codigoCnae: config.codigoCnae,
-          regimeEspecialTributacao: config.regimeEspecialTributacao || '',
-          optanteSimplesNacional: config.optanteSimplesNacional,
-          incentivadorCultural: config.incentivadorCultural,
+          serviceValue: input.serviceValue.toString(),
+          deductions: (input.deductions || 0).toString(),
+          discountValue: (input.discount || 0).toString(),
+          issRate: input.issRate.toString(),
+          issValue: ((input.serviceValue * input.issRate) / 100).toString(),
+          observations: input.observations || null,
+          serviceDate: new Date(),
         });
 
-        // Obter chave privada
-        let privateKeyContent = certificate.certificateKeyContent;
+        console.log('[NFe Router] Fatura criada:', invoice);
 
-        // Se não tiver no banco, tenta ler do arquivo local
-        if (!privateKeyContent) {
-          const localKeyPath = path.join(process.cwd(), 'private-key.pem');
-          if (fs.existsSync(localKeyPath)) {
-            privateKeyContent = fs.readFileSync(localKeyPath, 'utf-8');
+        // Emitir DANFE-Se
+        const nfseResult = await emitNfse({
+          prestadorCnpj: config.cnpj,
+          prestadorInscricaoMunicipal: config.inscricaoMunicipal,
+          prestadorRazaoSocial: 'Empresa Prestadora',
+          prestadorLogradouro: 'Rua Exemplo',
+          prestadorNumero: '123',
+          prestadorBairro: 'Bairro',
+          prestadorCidade: 'São Paulo',
+          prestadorEstado: 'SP',
+          prestadorCep: '01310100',
+          tomadorCpfCnpj: input.clientCpfCnpj,
+          tomadorRazaoSocial: input.clientName,
+          tomadorLogradouro: input.clientAddress,
+          tomadorNumero: '1',
+          tomadorBairro: input.clientBairro,
+          tomadorCidade: input.clientCity,
+          tomadorEstado: input.clientState,
+          tomadorCep: input.clientCep,
+          servicoDescricao: input.serviceDescription,
+          servicoValor: input.serviceValue,
+          servicoAliquotaIss: input.issRate,
+          servicoItemLista: config.itemListaServico,
+          deducoes: input.deductions,
+          desconto: input.discount,
+          observacoes: input.observations,
+          certificateContent: certificate.certificateKeyContent || '',
+        });
+
+        if (!nfseResult.success) {
+          // Atualizar fatura com erro
+          if (invoice) {
+            await updateInvoice(invoice[0].insertId as number, {
+              status: 'error',
+              errorMessage: nfseResult.error || undefined,
+            });
           }
-        }
 
-        if (!privateKeyContent) {
+          await notifyOwner({
+            title: 'Erro na Emissão de DANFE-Se',
+            content: `Erro ao emitir DANFE-Se para ${input.clientName}: ${nfseResult.error}`,
+          });
+
           throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Chave privada não encontrada',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Falha ao emitir DANFE-Se: ${nfseResult.error}`,
           });
         }
 
-        // Assinar XML
-        const signedXml = await signXml(xmlContent, privateKeyContent, certificate.thumbprint);
-
-        // Gerar PDF/DANFSe
-        const danfsePdfHtml = generateDanfsePdf({
-          numeroLote: Date.now().toString(),
-          cnpj: config.cnpj,
-          inscricaoMunicipal: config.inscricaoMunicipal,
-          rpsNumber,
-          rpsSeries: 'RPS',
-          rpsType: '1',
-          clientName: input.clientName,
-          clientCpfCnpj: input.clientCpfCnpj.replace(/\D/g, ''),
-          clientAddress: input.clientAddress,
-          clientCity: input.clientCity,
-          clientState: input.clientState,
-          clientCep: input.clientCep,
-          serviceDescription: input.serviceDescription,
-          serviceValue: String(input.serviceValue),
-          deductions: String(input.deductions || '0'),
-          itemListaServico: config.itemListaServico,
-          codigoCnae: config.codigoCnae,
-          regimeEspecialTributacao: config.regimeEspecialTributacao || '',
-          optanteSimplesNacional: config.optanteSimplesNacional,
-          incentivadorCultural: config.incentivadorCultural,
-          emittedAt: new Date(),
-        });
-
-        // Armazenar XML assinado diretamente no banco de dados
-        const invoiceResult = await createInvoice({
-          userId: ctx.user.id,
-          certificateId: certificate.id,
-          rpsNumber,
-          rpsSeriesNumber: 'RPS',
-          status: 'authorized',
-          clientName: input.clientName,
-          clientCpfCnpj: input.clientCpfCnpj,
-          clientAddress: input.clientAddress,
-          serviceDescription: input.serviceDescription,
-          serviceValue: String(input.serviceValue),
-          deductions: String(input.deductions || '0'),
-          observations: input.observations,
-          xmlSignedUrl: signedXml.substring(0, 100), // Armazenar preview do XML
-          xmlSignedStorageKey: signedXml, // Armazenar XML completo
-          pdfUrl: danfsePdfHtml.substring(0, 100), // Armazenar preview do PDF
-          pdfStorageKey: danfsePdfHtml, // Armazenar PDF completo
-          emittedAt: new Date(),
-        });
+        // Atualizar fatura com sucesso
+        if (invoice) {
+          await updateInvoice(invoice[0].insertId as number, {
+            status: 'authorized',
+            nfseNumber: nfseResult.nfseNumber || undefined,
+            protocolNumber: nfseResult.protocolNumber || undefined,
+            emittedAt: new Date(),
+          });
+        }
 
         await createAuditLog({
           userId: ctx.user.id,
-          action: 'emit_rps',
-          details: `RPS ${rpsNumber} emitido para ${input.clientName}`,
+          action: 'emit_danfse',
+          details: `DANFE-Se emitida: ${nfseResult.nfseNumber}`,
           ipAddress: ctx.req.ip,
         });
 
-        // Notificar proprietário
         await notifyOwner({
-          title: 'Nova Nota Fiscal Emitida',
-          content: `Uma nova nota fiscal foi emitida com sucesso para ${input.clientName} no valor de R$ ${input.serviceValue}`,
+          title: 'DANFE-Se Emitida com Sucesso',
+          content: `DANFE-Se #${nfseResult.nfseNumber} emitida para ${input.clientName}`,
         });
 
         return {
           success: true,
-          rpsNumber,
-          message: 'RPS emitido com sucesso',
+          invoiceId: invoice ? (invoice[0].insertId as number) : 0,
+          nfseNumber: nfseResult.nfseNumber,
+          protocolNumber: nfseResult.protocolNumber,
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao emitir RPS';
-
-        // Notificar proprietário sobre erro
-        await notifyOwner({
-          title: 'Erro na Emissão de Nota Fiscal',
-          content: `Erro ao emitir RPS para ${input.clientName}: ${message}`,
-        });
-
+        const message = error instanceof Error ? error.message : 'Erro ao emitir DANFE-Se';
+        console.error('[NFe Router] Erro:', message);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message,
@@ -304,20 +287,16 @@ export const nfeRouter = router({
     }),
 
   /**
-   * Histórico de notas fiscais
+   * Listar histórico de emissões
    */
-  getInvoices: protectedProcedure
-    .input(
-      z.object({
-        limit: z.number().default(10),
-        offset: z.number().default(0),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      return getInvoicesByUser(ctx.user.id, input.limit, input.offset);
-    }),
+  getInvoices: protectedProcedure.query(async ({ ctx }) => {
+    return getInvoicesByUser(ctx.user.id);
+  }),
 
-  getInvoiceStats: protectedProcedure.query(async ({ ctx }) => {
+  /**
+   * Obter estatísticas de emissões
+   */
+  getStats: protectedProcedure.query(async ({ ctx }) => {
     return getInvoiceStats(ctx.user.id);
   }),
 });

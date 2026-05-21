@@ -4,7 +4,7 @@ import { Loader2, FileText, TrendingUp, DollarSign } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
-  const statsQuery = trpc.nfe.getInvoiceStats.useQuery();
+  const statsQuery = trpc.nfe.getStats.useQuery();
   const configQuery = trpc.nfe.getCompanyConfig.useQuery();
 
   if (statsQuery.isLoading || configQuery.isLoading) {

@@ -15,7 +15,7 @@ export default function InvoiceHistory() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const listInvoicesQuery = trpc.nfe.getInvoices.useQuery({ limit: 20, offset: (page - 1) * 20 });
+  const listInvoicesQuery = trpc.nfe.getInvoices.useQuery();
 
   const handleDownloadXml = async (invoice: any): Promise<void> => {
     if (!invoice.xmlSignedUrl) {
