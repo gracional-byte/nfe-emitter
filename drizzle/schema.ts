@@ -52,8 +52,8 @@ export const certificates = mysqlTable("certificates", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id),
   certificateName: varchar("certificateName", { length: 255 }).notNull(),
-  certificateContent: text("certificateContent"), // Certificado público (X.509 PEM)
-  certificateKeyContent: text("certificateKeyContent"), // Chave privada (PEM)
+  certificateContent: text("certificate_content"), // Certificado público (X.509 PEM)
+  certificateKeyContent: text("certificate_key_content"), // Chave privada (PEM)
   thumbprint: varchar("thumbprint", { length: 255 }).notNull(),
   isActive: int("isActive").default(1).notNull(),
   expiresAt: timestamp("expiresAt"),
