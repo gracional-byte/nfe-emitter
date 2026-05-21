@@ -66,8 +66,14 @@ async function extractCertificateFromPfx(
     // Decodificar Base64
     const pfxBuffer = Buffer.from(pfxBase64, 'base64');
     
+    // Converter buffer para string binária corretamente
+    let binaryString = '';
+    for (let i = 0; i < pfxBuffer.length; i++) {
+      binaryString += String.fromCharCode(pfxBuffer[i]);
+    }
+    
     // Carregar o .pfx
-    const p12Asn1 = forge.asn1.fromDer(pfxBuffer.toString('binary'));
+    const p12Asn1 = forge.asn1.fromDer(binaryString);
     const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, password);
 
     // Extrair certificado
@@ -79,13 +85,25 @@ async function extractCertificateFromPfx(
     const cert = certBags.certBag[0].cert;
     const certificatePem = forge.pki.certificateToPem(cert);
 
-    // Extrair chave privada
-    const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
-    if (!keyBags.pkcs8ShroudedKeyBag || keyBags.pkcs8ShroudedKeyBag.length === 0) {
+    // Extrair chave privada - tentar ambos os tipos de bag
+    let key = null;
+    
+    // Primeiro tenta PKCS8 shrouded
+    const keyBags8 = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+    if (keyBags8.pkcs8ShroudedKeyBag && keyBags8.pkcs8ShroudedKeyBag.length > 0) {
+      key = keyBags8.pkcs8ShroudedKeyBag[0].key;
+    } else {
+      // Se não encontrar, tenta RSA key bag
+      const keyBagsRsa = p12.getBags({ bagType: forge.pki.oids.keyBag });
+      if (keyBagsRsa.keyBag && keyBagsRsa.keyBag.length > 0) {
+        key = keyBagsRsa.keyBag[0].key;
+      }
+    }
+    
+    if (!key) {
       throw new Error('Chave privada não encontrada no arquivo .pfx');
     }
 
-    const key = keyBags.pkcs8ShroudedKeyBag[0].key;
     const privateKeyPem = forge.pki.privateKeyToPem(key);
 
     return {
@@ -93,6 +111,7 @@ async function extractCertificateFromPfx(
       privateKey: privateKeyPem,
     };
   } catch (error: any) {
+    console.error('Erro ao processar .pfx:', error);
     throw new Error(`Erro ao processar .pfx: ${error.message}`);
   }
 }
