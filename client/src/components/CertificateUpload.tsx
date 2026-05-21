@@ -52,7 +52,12 @@ export function CertificateUpload() {
       if (fileType === 'pfx') {
         // Para .pfx, converter para Base64
         const buffer = await selectedFile.arrayBuffer();
-        fileContent = Buffer.from(buffer).toString('base64');
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        fileContent = btoa(binary);
       } else {
         // Para .pem, ler como texto
         fileContent = await selectedFile.text();
@@ -63,23 +68,21 @@ export function CertificateUpload() {
         certificateContent: fileContent,
         certificatePassword: fileType === 'pfx' ? certificatePassword : undefined,
         fileType,
-      });
+      } as any);
 
       toast.success('Certificado enviado com sucesso!');
       
       // Se extraiu CNPJ, preencher automaticamente
       if (result.extractedCnpj) {
         try {
-          const config = await trpc.nfe.getCompanyConfig.useQuery().data;
-          if (config) {
-            await updateConfigMutation.mutateAsync({
-              cnpj: result.extractedCnpj,
-              inscricaoMunicipal: config.inscricaoMunicipal || '',
-              itemListaServico: config.itemListaServico || '',
-              codigoCnae: config.codigoCnae || '',
-            });
-            toast.success(`CNPJ preenchido automaticamente: ${result.extractedCnpj}`);
-          }
+          await updateConfigMutation.mutateAsync({
+            cnpj: result.extractedCnpj,
+            inscricaoMunicipal: '',
+            itemListaServico: '0101',
+            codigoCnae: '9602502',
+          });
+          toast.success(`CNPJ preenchido automaticamente: ${result.extractedCnpj}`);
+          await utils.nfe.getCompanyConfig.invalidate();
         } catch (error) {
           console.log('CNPJ extraído:', result.extractedCnpj, '- Configure manualmente se necessário');
         }
