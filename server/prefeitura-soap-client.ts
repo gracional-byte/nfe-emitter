@@ -10,7 +10,7 @@ import { signXml } from './xml-signer';
 // URLs da Prefeitura de São Paulo para NFS-e
 // Documentação: https://notadomilhao.sf.prefeitura.sp.gov.br/desenvolvedor/
 // URLs da Prefeitura de SP - mesma URL para homolog e prod, diferença está no XML e credenciamento
-const PREFEITURA_WSDL_URL = 'https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx?WSDL';
+const PREFEITURA_WSDL_URL = 'https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx';
 const SOAP_ACTION_ENVIAR = 'http://www.prefeitura.sp.gov.br/nfe/wsdl/RecepcionarLoteRps';
 const SOAP_ACTION_CONSULTA = 'http://www.prefeitura.sp.gov.br/nfe/wsdl/ConsultaLote';
 const SOAP_ACTION_CONSULTA_NFE = 'http://www.prefeitura.sp.gov.br/nfe/wsdl/ConsultaNFe';
