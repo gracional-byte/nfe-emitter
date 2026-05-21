@@ -7,8 +7,10 @@ import { signXml } from './xml-signer';
  * Documentação: https://notadomilhao.sf.prefeitura.sp.gov.br/desenvolvedor/
  */
 
-const PREFEITURA_WSDL_PROD = 'https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx?wsdl';
-const PREFEITURA_WSDL_TEST = 'https://homolog.prefeitura.sp.gov.br/ws/lotenfe.asmx?wsdl';
+// URLs da Prefeitura de São Paulo para NFS-e
+// Documentação: https://notadomilhao.sf.prefeitura.sp.gov.br/desenvolvedor/
+const PREFEITURA_WSDL_PROD = 'https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx'; // URL corrigida
+const PREFEITURA_WSDL_TEST = 'https://homolog.prefeitura.sp.gov.br/ws/lotenfe.asmx?wsdl'; // Sem acento
 
 interface RpsData {
   numero: number;
