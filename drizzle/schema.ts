@@ -46,16 +46,15 @@ export type CompanyConfig = typeof companyConfig.$inferSelect;
 export type InsertCompanyConfig = typeof companyConfig.$inferInsert;
 
 /**
- * Certificados digitais (chaves privadas PEM)
+ * Certificados digitais (certificado público + chave privada PEM)
  */
 export const certificates = mysqlTable("certificates", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().references(() => users.id),
   certificateName: varchar("certificateName", { length: 255 }).notNull(),
-  certificateKeyUrl: text("certificateKeyUrl"), // URL S3 da chave privada (opcional)
-  certificateKeyStorageKey: varchar("certificateKeyStorageKey", { length: 255 }), // Chave de armazenamento S3 (opcional)
-  certificateKeyContent: text("certificateKeyContent"), // Conteúdo da chave privada (PEM) armazenado no banco
-  thumbprint: varchar("thumbprint", { length: 255 }).notNull(), // Identificador único do certificado
+  certificateContent: text("certificateContent"), // Certificado público (X.509 PEM)
+  certificateKeyContent: text("certificateKeyContent"), // Chave privada (PEM)
+  thumbprint: varchar("thumbprint", { length: 255 }).notNull(),
   isActive: int("isActive").default(1).notNull(),
   expiresAt: timestamp("expiresAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

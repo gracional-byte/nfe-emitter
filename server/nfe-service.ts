@@ -205,14 +205,23 @@ export function validatePrivateKey(keyContent: string): boolean {
 }
 
 /**
- * Gera thumbprint do certificado (identificador único)
+ * Calcula o thumbprint SHA-1 de um certificado X.509
  */
-export function generateThumbprint(certificateName: string): string {
-  return crypto
-    .createHash('sha256')
-    .update(certificateName + Date.now())
-    .digest('hex')
-    .substring(0, 32);
+export function generateThumbprint(certificatePem: string): string {
+  try {
+    const cleanedCert = certificatePem
+      .replace(/-----BEGIN CERTIFICATE-----/g, '')
+      .replace(/-----END CERTIFICATE-----/g, '')
+      .replace(/\s/g, '');
+    
+    const buffer = Buffer.from(cleanedCert, 'base64');
+    const thumbprint = crypto.createHash('sha1').update(buffer).digest('hex').toUpperCase();
+    
+    return thumbprint;
+  } catch (error: any) {
+    console.error('[NFe Service] Erro ao calcular thumbprint:', error.message);
+    throw new Error(`Failed to calculate certificate thumbprint: ${error.message}`);
+  }
 }
 
 /**

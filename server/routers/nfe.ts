@@ -106,14 +106,42 @@ export const nfeRouter = router({
           });
         }
 
-        // Gerar thumbprint
-        const thumbprint = generateThumbprint(input.certificateContent);
+        // Validar que contém chave privada
+        if (!input.certificateContent.includes('-----BEGIN PRIVATE KEY-----') && 
+            !input.certificateContent.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Certificado inválido. Deve conter a chave privada.',
+          });
+        }
 
-        // Criar certificado
+        // Extrair certificado público e chave privada
+        const certMatch = input.certificateContent.match(
+          /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/
+        );
+        const keyMatch = input.certificateContent.match(
+          /(-----BEGIN PRIVATE KEY-----[\s\S]*?-----END PRIVATE KEY-----|-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----)/
+        );
+
+        if (!certMatch || !keyMatch) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Não foi possível extrair certificado e chave privada do arquivo.',
+          });
+        }
+
+        const certificatePem = certMatch[0];
+        const privateKeyPem = keyMatch[0];
+
+        // Gerar thumbprint a partir do certificado público
+        const thumbprint = generateThumbprint(certificatePem);
+
+        // Criar certificado com ambos (público e privado)
         const certificate = await createCertificate({
           userId: ctx.user.id,
           certificateName: input.certificateName,
-          certificateKeyContent: input.certificateContent,
+          certificateContent: certificatePem,  // Certificado público
+          certificateKeyContent: privateKeyPem,  // Chave privada
           thumbprint,
           isActive: 1,
           expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 ano
@@ -170,6 +198,14 @@ export const nfeRouter = router({
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Nenhum certificado digital ativo encontrado',
+          });
+        }
+
+        // Validar que certificado tem ambos os campos
+        if (!certificate.certificateContent || !certificate.certificateKeyContent) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Certificado incompleto. Faça upload de um novo certificado.',
           });
         }
 
@@ -230,8 +266,8 @@ export const nfeRouter = router({
             dataFato: new Date().toISOString().split('T')[0],
             observacoes: input.observations,
           },
-          certificate.certificateKeyContent || '',
-          certificate.certificateKeyContent || ''
+          certificate.certificateKeyContent,  // Chave privada
+          certificate.certificateContent      // Certificado público
         );
 
         if (!nfseResult.success) {

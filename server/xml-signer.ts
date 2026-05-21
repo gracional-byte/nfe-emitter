@@ -1,6 +1,5 @@
 import crypto from 'crypto';
-import { JSDOM } from 'jsdom';
-import { DOMParser as DOMParserImpl } from '@xmldom/xmldom';
+import { DOMParser as DOMParserImpl, XMLSerializer } from '@xmldom/xmldom';
 
 /**
  * Serviço de assinatura digital XML para certificados A1
@@ -40,10 +39,16 @@ export async function signXmlWithCertificate(
     }
 
     // Carregar chave privada
-    const privateKey = crypto.createPrivateKey({
-      key: cleanedPrivateKey,
-      format: 'pem'
-    });
+    let privateKey: crypto.KeyObject;
+    try {
+      privateKey = crypto.createPrivateKey({
+        key: cleanedPrivateKey,
+        format: 'pem',
+        passphrase: undefined
+      });
+    } catch (keyError: any) {
+      throw new Error(`Failed to load private key: ${keyError.message}`);
+    }
 
     console.log('[XML Signer] Chave privada carregada com sucesso');
 
@@ -66,10 +71,14 @@ export async function signXmlWithCertificate(
     // Canonicalizar o elemento
     const canonicalXml = canonicalizeXml(elementToSign);
 
-    // Criar assinatura
+    // Criar assinatura RSA-SHA256
     const signature = crypto.createSign('sha256');
-    signature.update(canonicalXml);
+    signature.update(canonicalXml, 'utf-8');
     const signatureValue = signature.sign(privateKey, 'base64');
+
+    if (!signatureValue || signatureValue.length === 0) {
+      throw new Error('Failed to generate signature');
+    }
 
     console.log('[XML Signer] Assinatura gerada com sucesso');
 
@@ -88,7 +97,7 @@ export async function signXmlWithCertificate(
 
     console.log('[XML Signer] XML assinado com sucesso');
     return signedXml;
-  } catch (error) {
+  } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[XML Signer] Erro ao assinar XML:', errorMessage);
     throw new Error(`Failed to sign XML: ${errorMessage}`);
@@ -111,24 +120,28 @@ function cleanPemKey(pemKey: string): string {
  * Usa a canonicalização exclusiva (exc-c14n)
  */
 function canonicalizeXml(element: any): string {
-  // Implementação simplificada
-  // Em produção, usar uma biblioteca como 'xml-c14n'
-  const serializer = new (require('@xmldom/xmldom').XMLSerializer)();
-  let xml = serializer.serializeToString(element);
+  try {
+    const serializer = new XMLSerializer();
+    let xml = serializer.serializeToString(element);
 
-  // Remover espaços em branco entre tags
-  xml = xml.replace(/>\s+</g, '><');
+    // Remover espaços em branco entre tags
+    xml = xml.replace(/>\s+</g, '><');
 
-  // Remover atributos de namespace padrão
-  xml = xml.replace(/xmlns="[^"]*"/g, '');
+    // Remover atributos de namespace padrão
+    xml = xml.replace(/xmlns="[^"]*"/g, '');
 
-  return xml;
+    return xml;
+  } catch (error: any) {
+    console.error('[XML Signer] Erro ao canonicalizar XML:', error);
+    throw new Error(`Failed to canonicalize XML: ${error.message}`);
+  }
 }
 
 /**
  * Cria um elemento de assinatura XML no padrão xmldsig
  */
 function createSignatureElement(signatureValue: string, referenceUri: string): string {
+  // Calcular digest do URI de referência
   const digestValue = crypto.createHash('sha256').update(referenceUri).digest('base64');
 
   return `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
@@ -166,13 +179,34 @@ export function validatePrivateKey(privateKeyPem: string): boolean {
     // Tentar carregar a chave
     crypto.createPrivateKey({
       key: cleanedKey,
-      format: 'pem'
+      format: 'pem',
+      passphrase: undefined
     });
 
     console.log('[XML Signer] Chave privada validada com sucesso');
     return true;
-  } catch (error) {
-    console.error('[XML Signer] Erro ao validar chave privada:', error);
+  } catch (error: any) {
+    console.error('[XML Signer] Erro ao validar chave privada:', error.message);
     return false;
+  }
+}
+
+/**
+ * Calcula o thumbprint SHA-1 de um certificado X.509
+ */
+export function calculateCertificateThumbprint(certificatePem: string): string {
+  try {
+    const cleanedCert = certificatePem
+      .replace(/-----BEGIN CERTIFICATE-----/g, '')
+      .replace(/-----END CERTIFICATE-----/g, '')
+      .replace(/\s/g, '');
+    
+    const buffer = Buffer.from(cleanedCert, 'base64');
+    const thumbprint = crypto.createHash('sha1').update(buffer).digest('hex').toUpperCase();
+    
+    return thumbprint;
+  } catch (error: any) {
+    console.error('[XML Signer] Erro ao calcular thumbprint:', error.message);
+    throw new Error(`Failed to calculate certificate thumbprint: ${error.message}`);
   }
 }

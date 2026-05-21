@@ -18,13 +18,15 @@ const EmitRpsSchema = z.object({
   clientName: z.string().min(1, 'Nome do cliente obrigatório'),
   clientCpfCnpj: z.string().min(11, 'CPF ou CNPJ inválido').refine(isValidCPFOrCNPJ, 'CPF ou CNPJ inválido'),
   clientAddress: z.string().min(1, 'Endereço obrigatório'),
-  clientCity: z.string(),
-  clientState: z.string(),
-  clientCep: z.string(),
+  clientCity: z.string().min(1, 'Cidade obrigatória'),
+  clientState: z.string().min(2, 'Estado obrigatório'),
+  clientCep: z.string().min(8, 'CEP obrigatório'),
   clientBairro: z.string().min(1, 'Bairro obrigatório'),
   serviceDescription: z.string().min(1, 'Descrição do serviço obrigatória'),
   serviceValue: z.string().min(1, 'Valor obrigatório'),
-  deductions: z.string(),
+  issRate: z.string().default('5'),
+  deductions: z.string().default('0'),
+  discount: z.string().default('0'),
   observations: z.string().optional(),
 });
 
@@ -45,9 +47,12 @@ export default function EmitRps() {
       clientCity: 'São Paulo',
       clientState: 'SP',
       clientCep: '',
+      clientBairro: '',
       serviceDescription: '',
       serviceValue: '',
+      issRate: '5',
       deductions: '0',
+      discount: '0',
       observations: '',
     },
   });
@@ -58,17 +63,33 @@ export default function EmitRps() {
       return;
     }
 
+    if (!selectedCert) {
+      toast.error('Selecione um certificado digital para continuar.');
+      return;
+    }
+
     setIsLoading(true);
     try {
       await emitDanfseMutation.mutateAsync({
-        ...data,
+        clientName: data.clientName,
+        clientCpfCnpj: data.clientCpfCnpj,
+        clientAddress: data.clientAddress,
+        clientCity: data.clientCity,
+        clientState: data.clientState,
+        clientCep: data.clientCep,
+        clientBairro: data.clientBairro,
+        serviceDescription: data.serviceDescription,
         serviceValue: parseFloat(data.serviceValue),
-        deductions: data.deductions ? parseFloat(data.deductions) : undefined,
+        issRate: parseFloat(data.issRate),
+        deductions: parseFloat(data.deductions),
+        discount: parseFloat(data.discount),
+        observations: data.observations,
       });
-      toast.success('RPS emitido com sucesso!');
+      toast.success('DANFE-Se emitida com sucesso!');
       form.reset();
+      setSelectedCert(null);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao emitir RPS';
+      const message = error instanceof Error ? error.message : 'Erro ao emitir DANFE-Se';
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -102,11 +123,18 @@ export default function EmitRps() {
 
   return (
     <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Emitir DANFE-Se</h1>
+        <p className="text-muted-foreground mt-2">
+          Preencha os dados do cliente e do serviço para emitir uma nova Nota Fiscal de Serviço Eletrônica.
+        </p>
+      </div>
+
       {/* Seletor de Certificado */}
       <Card>
         <CardHeader>
           <CardTitle>1. Selecione seu Certificado Digital</CardTitle>
-          <CardDescription>Escolha o certificado digital instalado no seu computador</CardDescription>
+          <CardDescription>Escolha o certificado digital para assinar a nota fiscal</CardDescription>
         </CardHeader>
         <CardContent>
           <CertificateSelector onCertificateSelected={setSelectedCert} />
@@ -121,16 +149,10 @@ export default function EmitRps() {
           </AlertDescription>
         </Alert>
       )}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Emitir DANFE-Se</h1>
-        <p className="text-muted-foreground mt-2">
-          Preencha os dados do cliente e do serviço para emitir uma nova Nota Fiscal de Serviço Eletrônica.
-        </p>
-      </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Dados do Cliente</CardTitle>
+          <CardTitle>2. Dados do Cliente</CardTitle>
           <CardDescription>
             Informações do tomador do serviço
           </CardDescription>
@@ -164,7 +186,6 @@ export default function EmitRps() {
                           placeholder="000.000.000-00 ou 00.000.000/0000-00" 
                           {...field}
                           onChange={(e) => {
-                            // Remove caracteres não numéricos para validação
                             const value = e.target.value.replace(/\D/g, '');
                             field.onChange(value);
                           }}
@@ -191,12 +212,12 @@ export default function EmitRps() {
 
                 <FormField
                   control={form.control}
-                  name="clientCep"
+                  name="clientBairro"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>CEP</FormLabel>
+                      <FormLabel>Bairro</FormLabel>
                       <FormControl>
-                        <Input placeholder="01001000" {...field} />
+                        <Input placeholder="Centro" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -216,10 +237,38 @@ export default function EmitRps() {
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="clientState"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estado</FormLabel>
+                      <FormControl>
+                        <Input placeholder="SP" maxLength={2} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="clientCep"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CEP</FormLabel>
+                      <FormControl>
+                        <Input placeholder="01001000" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Dados do Serviço</h3>
+                <h3 className="text-lg font-semibold mb-4">3. Dados do Serviço</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
@@ -259,6 +308,28 @@ export default function EmitRps() {
 
                   <FormField
                     control={form.control}
+                    name="issRate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Alíquota ISS (%)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="5.00"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Alíquota de ISS (padrão: 5%)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="deductions"
                     render={({ field }) => (
                       <FormItem>
@@ -273,6 +344,28 @@ export default function EmitRps() {
                         </FormControl>
                         <FormDescription>
                           Opcional: descontos ou deduções
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="discount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Desconto (R$)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Opcional: desconto comercial
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -304,7 +397,7 @@ export default function EmitRps() {
                 </p>
               </div>
 
-              <Button type="submit" disabled={isLoading} className="w-full">
+              <Button type="submit" disabled={isLoading || !selectedCert} className="w-full">
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
