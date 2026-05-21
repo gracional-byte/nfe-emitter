@@ -33,7 +33,7 @@ const getMenuItems = (isAdmin: boolean) => {
   ];
   
   const adminItems = [
-    { icon: FileText, label: "Emitir RPS", path: "/emit" },
+    { icon: FileText, label: "Emitir DANFE-Se", path: "/emit" },
     { icon: History, label: "Histórico", path: "/history" },
     { icon: SettingsIcon, label: "Configurações", path: "/settings" },
     { icon: Code, label: "Editor de Código", path: "/editor" },

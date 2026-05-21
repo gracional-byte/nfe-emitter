@@ -107,3 +107,17 @@
 - [x] Integrar CertificateUpload na página Settings
 - [x] Validação de certificado PEM
 - [x] Armazenamento de certificado no banco de dados
+
+
+## Migração para DANFE-Se (Sessão Atual)
+- [x] Instalar bibliotecas xmldsigjs, soap, jsdom, @xmldom/xmldom
+- [x] Criar serviço de assinatura XML robusto (xml-signer.ts)
+- [x] Criar gerador de XML DANFE-Se (danfse-generator.ts)
+- [x] Atualizar schema de invoices para DANFE-Se
+- [x] Aplicar migração SQL ao banco de dados
+- [x] Renomear "Emitir RPS" para "Emitir DANFE-Se" em toda UI
+- [ ] Reescrever procedures tRPC para emissão DANFE-Se
+- [ ] Integrar com WebService SOAP da Prefeitura SP
+- [ ] Atualizar formulário para campos DANFE-Se
+- [ ] Testar assinatura digital com certificado real
+- [ ] Testar integração com API da Prefeitura

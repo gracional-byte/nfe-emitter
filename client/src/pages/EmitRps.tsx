@@ -87,7 +87,7 @@ export default function EmitRps() {
     return (
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Emitir RPS</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Emitir DANFE-Se</h1>
         </div>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -122,9 +122,9 @@ export default function EmitRps() {
         </Alert>
       )}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Emitir RPS</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Emitir DANFE-Se</h1>
         <p className="text-muted-foreground mt-2">
-          Preencha os dados do cliente e do serviço para emitir uma nova nota fiscal.
+          Preencha os dados do cliente e do serviço para emitir uma nova Nota Fiscal de Serviço Eletrônica.
         </p>
       </div>
 
@@ -308,12 +308,12 @@ export default function EmitRps() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Emitindo RPS...
+                    Emitindo DANFE-Se...
                   </>
                 ) : (
                   <>
                     <Send className="mr-2 h-4 w-4" />
-                    Emitir RPS
+                    Emitir DANFE-Se
                   </>
                 )}
               </Button>
