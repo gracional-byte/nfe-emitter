@@ -232,6 +232,9 @@ importers:
       xmldsigjs:
         specifier: ^2.8.7
         version: 2.8.7(@xmldom/xmldom@0.9.10)
+      xpath:
+        specifier: ^0.0.34
+        version: 0.0.34
       zod:
         specifier: ^4.1.12
         version: 4.1.12

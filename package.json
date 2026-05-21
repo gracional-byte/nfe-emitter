@@ -85,6 +85,7 @@
     "xml-crypto": "^6.1.2",
     "xml-sign": "^0.0.3",
     "xmldsigjs": "^2.8.7",
+    "xpath": "^0.0.34",
     "zod": "^4.1.12"
   },
   "devDependencies": {
