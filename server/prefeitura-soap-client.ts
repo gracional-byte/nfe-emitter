@@ -1,6 +1,6 @@
 import * as soap from 'soap';
 import { createPrivateKey } from 'crypto';
-import { signXmlWithCertificate } from './xml-signer';
+import { signXml } from './xml-signer';
 
 /**
  * Cliente SOAP para integração com Prefeitura de SP
@@ -133,10 +133,7 @@ export class PrefeituraSoapClient {
       const rpsXml = this.generateRpsXml(rpsData);
 
       // Assina o XML
-      const signedXml = await signXmlWithCertificate(rpsXml, {
-        privateKeyPem,
-        certificatePem,
-      });
+      const signedXml = await signXml(rpsXml, privateKeyPem, certificatePem);
 
       // Chama método SOAP
       const result = await this.callSoapMethod('EnviarRps', {
@@ -222,11 +219,7 @@ export class PrefeituraSoapClient {
   <Motivo>${motivo}</Motivo>
 </Cancelamento>`;
 
-      const signedXml = await signXmlWithCertificate(cancelXml, {
-        privateKeyPem,
-      });
-
-      const result = await this.callSoapMethod('CancelarNfse', {
+      const signedXml = await signXml(cancelXml, privateKeyPem, certificatePem);const result = await this.callSoapMethod('CancelarNfse', {
         xml: signedXml,
       });
 
