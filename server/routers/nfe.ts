@@ -220,38 +220,65 @@ export const nfeRouter = router({
         }
 
         // Gerar thumbprint a partir do certificado público
-        const thumbprint = generateThumbprint(certificatePem);
+        let thumbprint = '';
+        try {
+          thumbprint = generateThumbprint(certificatePem);
+        } catch (e) {
+          thumbprint = 'UNKNOWN';
+        }
         
         // Extrair informações do certificado (CNPJ, etc)
-        const certInfo = extractCertificateInfo(certificatePem);
+        let extractedCnpj: string | undefined;
+        try {
+          const certInfo = extractCertificateInfo(certificatePem);
+          extractedCnpj = certInfo.cnpj;
+        } catch (e) {
+          console.error('Erro ao extrair CNPJ:', e);
+        }
 
         // Criar certificado com ambos (público e privado)
-        const certificate = await createCertificate({
-          userId: ctx.user.id,
-          certificateName: input.certificateName,
-          certificateContent: certificatePem,  // Certificado público
-          certificateKeyContent: privateKeyPem,  // Chave privada
-          thumbprint,
-          isActive: 1,
-          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 ano
-        });
+        let certificate;
+        try {
+          certificate = await createCertificate({
+            userId: ctx.user.id,
+            certificateName: input.certificateName,
+            certificateContent: certificatePem,  // Certificado público
+            certificateKeyContent: privateKeyPem,  // Chave privada
+            thumbprint,
+            isActive: 1,
+            expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 ano
+          });
+        } catch (dbError: any) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao salvar certificado no banco de dados: ${dbError.message}`,
+          });
+        }
 
-        await createAuditLog({
-          userId: ctx.user.id,
-          action: 'upload_certificate',
-          details: `Certificado ${input.certificateName} enviado (${input.fileType})`,
-          ipAddress: ctx.req.ip,
-        });
+        try {
+          await createAuditLog({
+            userId: ctx.user.id,
+            action: 'upload_certificate',
+            details: `Certificado ${input.certificateName} enviado (${input.fileType})`,
+            ipAddress: ctx.req.ip,
+          });
+        } catch (e) {
+          console.error('Erro ao criar audit log:', e);
+        }
 
-        await notifyOwner({
-          title: 'Certificado Digital Enviado',
-          content: `Certificado ${input.certificateName} foi enviado com sucesso`,
-        });
+        try {
+          await notifyOwner({
+            title: 'Certificado Digital Enviado',
+            content: `Certificado ${input.certificateName} foi enviado com sucesso`,
+          });
+        } catch (e) {
+          console.error('Erro ao notificar owner:', e);
+        }
 
         return { 
           success: true, 
           certificate,
-          extractedCnpj: certInfo.cnpj,
+          extractedCnpj,
         };
       } catch (error: any) {
         throw new TRPCError({
