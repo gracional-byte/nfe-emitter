@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, FileText, TrendingUp, DollarSign } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -8,14 +8,6 @@ export default function Dashboard() {
   const statsQuery = trpc.nfe.getInvoiceStats.useQuery();
   const invoicesQuery = trpc.nfe.getInvoices.useQuery();
   const configQuery = trpc.nfe.getCompanyConfig.useQuery();
-
-  if (statsQuery.isLoading || configQuery.isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
-  }
 
   const stats = statsQuery.data || { total: 0, thisMonth: 0, totalValue: 0 };
   const config = configQuery.data;
@@ -53,6 +45,7 @@ export default function Dashboard() {
         </p>
       </div>
 
+      {/* Cards de Estatísticas - Carrega independentemente */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -60,10 +53,16 @@ export default function Dashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              DANFE-Se autorizadas
-            </p>
+            {statsQuery.isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.total}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  DANFE-Se autorizadas
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -73,10 +72,16 @@ export default function Dashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.thisMonth}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              DANFE-Se emitidas este mês
-            </p>
+            {statsQuery.isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.thisMonth}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  DANFE-Se emitidas este mês
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -86,16 +91,23 @@ export default function Dashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              R$ {(stats.totalValue || 0).toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Valor total emitido
-            </p>
+            {statsQuery.isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  R$ {(stats.totalValue || 0).toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Valor total emitido
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
 
+      {/* Gráfico - Carrega independentemente */}
       <Card>
         <CardHeader>
           <CardTitle>Emissões por Período</CardTitle>
@@ -104,20 +116,36 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="notas" stroke="#3b82f6" name="DANFE-Se Emitidas" />
-            </LineChart>
-          </ResponsiveContainer>
+          {invoicesQuery.isLoading ? (
+            <div className="flex items-center justify-center h-[300px]">
+              <Loader2 className="w-8 h-8 animate-spin" />
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="notas" stroke="#3b82f6" name="DANFE-Se Emitidas" />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </CardContent>
       </Card>
 
-      {config && (
+      {/* Informações da Empresa - Carrega independentemente */}
+      {configQuery.isLoading ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Informações da Empresa</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center h-[200px]">
+            <Loader2 className="w-8 h-8 animate-spin" />
+          </CardContent>
+        </Card>
+      ) : config ? (
         <Card>
           <CardHeader>
             <CardTitle>Informações da Empresa</CardTitle>
@@ -156,7 +184,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
     </div>
   );
 }
