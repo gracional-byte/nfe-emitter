@@ -69,8 +69,9 @@ export class PrefeituraSoapClient {
     const desconto = (rpsData.desconto || 0).toFixed(2);
 
     return `<?xml version="1.0" encoding="UTF-8"?>
-<Lote>
-  <RPS>
+<PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.prefeitura.sp.gov.br/nfe http://www.prefeitura.sp.gov.br/nfe/schemas/PedidoEnvioLoteRPS.xsd">
+  <Lote Id="L1">
+  <RPS Id="R1">
     <Numero>${rpsData.numero}</Numero>
     <Serie>${rpsData.serie}</Serie>
     <Tipo>${rpsData.tipo}</Tipo>
@@ -107,7 +108,8 @@ export class PrefeituraSoapClient {
     <DataFato>${rpsData.dataFato}</DataFato>
     ${rpsData.observacoes ? `<Observacoes>${rpsData.observacoes}</Observacoes>` : ''}
   </RPS>
-</Lote>`;
+</Lote>
+</PedidoEnvioLoteRPS>`;
   }
 
   /**
