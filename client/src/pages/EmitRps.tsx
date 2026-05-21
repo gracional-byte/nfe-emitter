@@ -71,6 +71,7 @@ export default function EmitRps() {
     setIsLoading(true);
     try {
       await emitDanfseMutation.mutateAsync({
+        certificateId: selectedCert.id,
         clientName: data.clientName,
         clientCpfCnpj: data.clientCpfCnpj,
         clientAddress: data.clientAddress,
