@@ -303,8 +303,8 @@ export const nfeRouter = router({
           });
         }
 
-        // Obter certificado
-        const certificate = await getActiveCertificate(input.certificateId);
+        // Obter certificado do usuário logado
+        const certificate = await getActiveCertificate(ctx.user.id);
         if (!certificate) {
           throw new TRPCError({
             code: 'NOT_FOUND',
