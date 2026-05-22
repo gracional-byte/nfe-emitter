@@ -10,7 +10,7 @@ import EmitRps from "./pages/EmitRps";
 import InvoiceHistory from "./pages/InvoiceHistory";
 import Settings from "./pages/Settings";
 import CodeEditor from "./pages/CodeEditor";
-import { History } from "./pages/History";
+import History from "./pages/History";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 function Router() {

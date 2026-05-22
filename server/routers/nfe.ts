@@ -411,9 +411,6 @@ export const nfeRouter = router({
             deducoes: input.deductions || 0,
             desconto: input.discount || 0,
             issAliquota: input.issRate / 100,
-            certificateContent: certificate.certificateContent,
-            certificateKeyContent: certificate.certificateKeyContent,
-            thumbprint: certificate.thumbprint,
           },
           certificate.certificateContent,
           certificate.certificateKeyContent
