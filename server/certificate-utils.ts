@@ -1,4 +1,4 @@
-import * as forge from 'node-forge';
+import forge from 'node-forge';
 
 /**
  * Extrair informações do certificado X.509
@@ -11,7 +11,7 @@ export function extractCertificateInfo(certificatePem: string): {
   validTo?: Date;
 } {
   try {
-    const cert = forge.pki.certificateFromPem(certificatePem);
+    const cert = (forge as any).pki.certificateFromPem(certificatePem);
     
     // Extrair CNPJ do subject
     let cnpj: string | undefined;

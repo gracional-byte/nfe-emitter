@@ -1,5 +1,7 @@
 import * as soap from 'soap';
 import { createPrivateKey } from 'crypto';
+import * as https from 'https';
+import * as fs from 'fs';
 import { signXml } from './xml-signer';
 
 /**
@@ -45,16 +47,68 @@ interface RpsData {
 
 export class PrefeituraSoapClient {
   private soapClient: any;
+  private certificatePem: string = '';
+  private privateKeyPem: string = '';
+  private httpsAgent: https.Agent | null = null;
 
   /**
-   * Inicializa o cliente SOAP
+   * Define certificado e chave privada
+   */
+  setCertificate(cert: string, key: string): void {
+    this.certificatePem = cert;
+    this.privateKeyPem = key;
+    
+    // Criar agent com certificado
+    this.httpsAgent = new https.Agent({
+      cert: this.certificatePem,
+      key: this.privateKeyPem,
+      rejectUnauthorized: false,
+    });
+  }
+
+  /**
+   * Inicializa o cliente SOAP com certificado digital
    */
   async initialize(): Promise<void> {
     try {
-      this.soapClient = await soap.createClientAsync(PREFEITURA_WSDL_URL, {
+      if (!this.httpsAgent) {
+        throw new Error('Certificado não foi configurado. Chame setCertificate() primeiro.');
+      }
+
+      console.log('[SOAP] Criando opções de cliente SOAP...');
+      // Criar cliente SOAP com agent customizado
+      const options: any = {
         disableCache: true,
-      });
+        httpClient: {
+          request: (rurl: string, opts: any, callback: any) => {
+            console.log('[SOAP] Fazendo requisição HTTPS para:', rurl);
+            // Garantir que opts existe e tem o agent
+            const finalOpts = {
+              ...opts,
+              agent: this.httpsAgent,
+              rejectUnauthorized: false,
+            };
+            try {
+              const req = https.request(rurl, finalOpts, callback);
+              req.on('error', (err: any) => {
+                console.error('[SOAP] Erro na requisição HTTPS:', err?.message || err);
+              });
+              return req;
+            } catch (err: any) {
+              console.error('[SOAP] Erro ao criar requisição HTTPS:', err?.message || err);
+              callback(err);
+              return null as any;
+            }
+          },
+        },
+      };
+
+      console.log('[SOAP] Chamando soap.createClientAsync...');
+      this.soapClient = await soap.createClientAsync(PREFEITURA_WSDL_URL, options);
+      console.log('[SOAP] Cliente SOAP criado com sucesso!');
     } catch (error: any) {
+      console.error('[SOAP] Erro ao inicializar cliente:', error?.message || error);
+      console.error('[SOAP] Stack trace:', error?.stack);
       throw new Error(`Falha ao conectar com WebService da Prefeitura: ${error?.message || 'Erro desconhecido'}`);
     }
   }
@@ -126,35 +180,72 @@ export class PrefeituraSoapClient {
     error?: string;
   }> {
     try {
+      console.log('[SOAP] Iniciando emissão de RPS...');
+      
+      // Configurar certificado
+      this.setCertificate(certificatePem, privateKeyPem);
+      
+      // Inicializar cliente SOAP
       if (!this.soapClient) {
+        console.log('[SOAP] Inicializando cliente SOAP...');
         await this.initialize();
       }
 
       // Gera XML do RPS
+      console.log('[SOAP] Gerando XML do RPS...');
       const rpsXml = this.generateRpsXml(rpsData);
 
       // Assina o XML
+      console.log('[SOAP] Assinando XML...');
       const signedXml = await signXml(rpsXml, privateKeyPem, certificatePem);
 
-      // Chama método SOAP
-      const result = await this.callSoapMethod('EnviarRps', {
-        xml: signedXml,
-      });
+      // Chama método SOAP com timeout
+      console.log('[SOAP] Chamando método RecepcionarLoteRps...');
+      const result = await Promise.race([
+        new Promise((resolve, reject) => {
+          try {
+            this.soapClient.RecepcionarLoteRps(
+              { xml: signedXml },
+              (err: any, result: any) => {
+                if (err) {
+                  console.error('[SOAP] Erro ao chamar RecepcionarLoteRps:', err?.message || err);
+                  reject(err);
+                } else {
+                  console.log('[SOAP] Resposta recebida com sucesso');
+                  resolve(result);
+                }
+              }
+            );
+          } catch (callErr: any) {
+            console.error('[SOAP] Erro ao invocar método:', callErr?.message || callErr);
+            reject(callErr);
+          }
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout ao conectar com Prefeitura (60s)')), 60000)
+        )
+      ]);
+
 
       // Processa resposta
-      if (result.Sucesso) {
+      const resultData = result as any;
+      if (resultData?.RecepcionarLoteRpsResult?.Sucesso) {
+        console.log('[SOAP] RPS emitido com sucesso!');
         return {
           success: true,
-          nfseNumber: result.NfseNumber,
-          protocol: result.Protocol,
+          nfseNumber: resultData.RecepcionarLoteRpsResult.NfseNumber,
+          protocol: resultData.RecepcionarLoteRpsResult.Protocol,
         };
       } else {
+        const errorMsg = resultData?.RecepcionarLoteRpsResult?.Mensagem || 'Erro desconhecido ao emitir NFS-e';
+        console.error('[SOAP] Erro na resposta:', errorMsg);
         return {
           success: false,
-          error: result.Mensagem || 'Erro desconhecido ao emitir NFS-e',
+          error: errorMsg,
         };
       }
     } catch (error: any) {
+      console.error('[SOAP] Exceção ao enviar RPS:', error?.message || error);
       return {
         success: false,
         error: `Falha ao enviar RPS: ${error?.message || 'Erro desconhecido'}`,
@@ -175,25 +266,32 @@ export class PrefeituraSoapClient {
         await this.initialize();
       }
 
-      const result = await this.callSoapMethod('ConsultarNfse', {
-        numero: nfseNumber,
+      const result = await new Promise((resolve, reject) => {
+        this.soapClient.ConsultarNfse(
+          { numero: nfseNumber },
+          (err: any, result: any) => {
+            if (err) reject(err);
+            else resolve(result);
+          }
+        );
       });
 
-      if (result.Sucesso) {
+      const resultData = result as any;
+      if (resultData?.ConsultarNfseResult?.Sucesso) {
         return {
           success: true,
-          nfseData: result,
+          nfseData: resultData.ConsultarNfseResult,
         };
       } else {
         return {
           success: false,
-          error: result.Mensagem || 'NFS-e não encontrada',
+          error: resultData?.ConsultarNfseResult?.Mensagem || 'Erro ao consultar NFS-e',
         };
       }
     } catch (error: any) {
       return {
         success: false,
-        error: `Erro ao consultar NFS-e: ${error?.message || 'Erro desconhecido'}`,
+        error: `Falha ao consultar NFS-e: ${error?.message || 'Erro desconhecido'}`,
       };
     }
   }
@@ -201,11 +299,7 @@ export class PrefeituraSoapClient {
   /**
    * Cancela NFS-e
    */
-  async cancelarNfse(
-    nfseNumber: string,
-    motivo: string,
-    privateKeyPem: string
-  ): Promise<{
+  async cancelarNfse(nfseNumber: string, motivo: string): Promise<{
     success: boolean;
     error?: string;
   }> {
@@ -214,59 +308,30 @@ export class PrefeituraSoapClient {
         await this.initialize();
       }
 
-      const cancelXml = `<?xml version="1.0" encoding="UTF-8"?>
-<Cancelamento>
-  <NfseNumber>${nfseNumber}</NfseNumber>
-  <Motivo>${motivo}</Motivo>
-</Cancelamento>`;
-
-      const signedXml = await signXml(cancelXml, privateKeyPem, certificatePem);const result = await this.callSoapMethod('CancelarNfse', {
-        xml: signedXml,
+      const result = await new Promise((resolve, reject) => {
+        this.soapClient.CancelarNfse(
+          { numero: nfseNumber, motivo },
+          (err: any, result: any) => {
+            if (err) reject(err);
+            else resolve(result);
+          }
+        );
       });
 
-      if (result.Sucesso) {
+      const resultData = result as any;
+      if (resultData?.CancelarNfseResult?.Sucesso) {
         return { success: true };
       } else {
         return {
           success: false,
-          error: result.Mensagem || 'Erro ao cancelar NFS-e',
+          error: resultData?.CancelarNfseResult?.Mensagem || 'Erro ao cancelar NFS-e',
         };
       }
     } catch (error: any) {
       return {
         success: false,
-        error: `Erro ao cancelar NFS-e: ${error?.message || 'Erro desconhecido'}`,
+        error: `Falha ao cancelar NFS-e: ${error?.message || 'Erro desconhecido'}`,
       };
     }
-  }
-
-  /**
-   * Chama método SOAP genérico
-   */
-  private async callSoapMethod(methodName: string, params: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const method = this.soapClient[methodName];
-      if (!method) {
-        reject(new Error(`Metodo SOAP ${methodName} nao encontrado`));
-        return;
-      }
-
-      const soapAction = methodName === 'EnviarRps' ? SOAP_ACTION_ENVIAR :
-                         methodName === 'ConsultarNfse' ? SOAP_ACTION_CONSULTA_NFE :
-                         SOAP_ACTION_CONSULTA;
-      
-      const options = {
-        'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': soapAction,
-      };
-
-      method(params, options, (err: any, result: any) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(result);
-        }
-      });
-    });
   }
 }

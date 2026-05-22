@@ -11,7 +11,6 @@ export function CertificateUpload() {
   const [isLoading, setIsLoading] = useState(false);
   const [certificateName, setCertificateName] = useState('');
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
-  const [privateKeyFile, setPrivateKeyFile] = useState<File | null>(null);
   
   const certificatesQuery = trpc.nfe.getCertificates.useQuery();
   const uploadMutation = trpc.nfe.uploadCertificate.useMutation();
@@ -20,19 +19,10 @@ export function CertificateUpload() {
 
   const handleCertificateSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.name.endsWith('.pem')) {
+    if (file && (file.name.endsWith('.pem') || file.name.endsWith('.pfx'))) {
       setCertificateFile(file);
     } else {
-      toast.error('Por favor, selecione um arquivo .pem válido');
-    }
-  };
-
-  const handlePrivateKeySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.name.endsWith('.pem')) {
-      setPrivateKeyFile(file);
-    } else {
-      toast.error('Por favor, selecione um arquivo .pem válido');
+      toast.error('Por favor, selecione um arquivo .pem ou .pfx válido');
     }
   };
 
@@ -43,35 +33,30 @@ export function CertificateUpload() {
     }
 
     if (!certificateFile) {
-      toast.error('Por favor, selecione o arquivo de certificado público (.pem)');
-      return;
-    }
-
-    if (!privateKeyFile) {
-      toast.error('Por favor, selecione o arquivo de chave privada (.pem)');
+      toast.error('Por favor, selecione o arquivo de certificado (.pem ou .pfx)');
       return;
     }
 
     setIsLoading(true);
     try {
-      // Ler ambos os arquivos
+      // Ler o arquivo
       const certificateContent = await certificateFile.text();
-      const privateKeyContent = await privateKeyFile.text();
+      
+      // Determinar tipo de arquivo
+      const fileType = certificateFile.name.endsWith('.pfx') ? 'pfx' : 'pem';
 
-      // Validar que são PEM válidos
-      if (!certificateContent.includes('BEGIN CERTIFICATE')) {
-        throw new Error('Arquivo de certificado não é um PEM válido');
-      }
-      if (!privateKeyContent.includes('BEGIN PRIVATE KEY') && !privateKeyContent.includes('BEGIN RSA PRIVATE KEY')) {
-        throw new Error('Arquivo de chave privada não é um PEM válido');
+      // Validar que é um certificado válido
+      if (fileType === 'pem') {
+        if (!certificateContent.includes('BEGIN CERTIFICATE') && !certificateContent.includes('BEGIN PRIVATE KEY')) {
+          throw new Error('Arquivo PEM não é válido. Deve conter certificado e/ou chave privada');
+        }
       }
 
       const result = await uploadMutation.mutateAsync({
         certificateName: certificateName.trim(),
         certificateContent: certificateContent,
         certificatePassword: undefined,
-        fileType: 'pem',
-        privateKey: privateKeyContent,
+        fileType: fileType,
       } as any);
 
       toast.success('Certificado enviado com sucesso!');
@@ -94,7 +79,6 @@ export function CertificateUpload() {
 
       setCertificateName('');
       setCertificateFile(null);
-      setPrivateKeyFile(null);
 
       // Refresh certificates list
       await utils.nfe.getCertificates.invalidate();
@@ -112,18 +96,23 @@ export function CertificateUpload() {
         <CardHeader>
           <CardTitle>Certificado Digital</CardTitle>
           <CardDescription>
-            Faça upload de seu certificado digital em formato PEM
+            Faça upload de seu certificado digital em formato PEM ou PFX
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert className="bg-blue-50 border-blue-200">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800 text-sm">
+              <strong>Formatos aceitos:</strong>
+              <br />
+              • <strong>PEM (recomendado):</strong> Um único arquivo contendo certificado + chave privada
+              <br />
+              • <strong>PFX:</strong> Arquivo PKCS#12 com certificado e chave privada
+              <br />
+              <br />
               <strong>Como converter .pfx para .pem:</strong>
               <br />
-              1. Certificado público: <code className="bg-white px-2 py-1 rounded">openssl pkcs12 -in arquivo.pfx -clcerts -nokeys -out certificado.pem</code>
-              <br />
-              2. Chave privada: <code className="bg-white px-2 py-1 rounded">openssl pkcs12 -in arquivo.pfx -nocerts -out chave.pem</code>
+              <code className="bg-white px-2 py-1 rounded text-xs">openssl pkcs12 -in arquivo.pfx -out certificado.pem -nodes</code>
             </AlertDescription>
           </Alert>
 
@@ -139,11 +128,11 @@ export function CertificateUpload() {
             </div>
 
             <div>
-              <label className="text-sm font-medium">Certificado Público (.pem)</label>
+              <label className="text-sm font-medium">Arquivo de Certificado (.pem ou .pfx)</label>
               <div className="flex gap-2">
                 <Input
                   type="file"
-                  accept=".pem"
+                  accept=".pem,.pfx"
                   onChange={handleCertificateSelect}
                   disabled={isLoading}
                 />
@@ -155,26 +144,9 @@ export function CertificateUpload() {
               )}
             </div>
 
-            <div>
-              <label className="text-sm font-medium">Chave Privada (.pem)</label>
-              <div className="flex gap-2">
-                <Input
-                  type="file"
-                  accept=".pem"
-                  onChange={handlePrivateKeySelect}
-                  disabled={isLoading}
-                />
-              </div>
-              {privateKeyFile && (
-                <p className="text-sm text-green-600 mt-2">
-                  ✓ Arquivo selecionado: {privateKeyFile.name}
-                </p>
-              )}
-            </div>
-
             <Button
               onClick={handleUpload}
-              disabled={isLoading || !certificateFile || !privateKeyFile || !certificateName.trim()}
+              disabled={isLoading || !certificateFile || !certificateName.trim()}
               className="w-full"
             >
               {isLoading ? (

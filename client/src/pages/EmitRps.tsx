@@ -70,6 +70,23 @@ export default function EmitRps() {
 
     setIsLoading(true);
     try {
+      const serviceValue = parseFloat(data.serviceValue);
+      const issRate = parseFloat(data.issRate);
+      const deductions = parseFloat(data.deductions);
+      const discount = parseFloat(data.discount);
+      
+      // Validar que os números não são NaN
+      if (isNaN(serviceValue)) {
+        toast.error('Valor do serviço inválido');
+        setIsLoading(false);
+        return;
+      }
+      if (isNaN(issRate)) {
+        toast.error('Alíquota ISS inválida');
+        setIsLoading(false);
+        return;
+      }
+      
       await emitDanfseMutation.mutateAsync({
         certificateId: selectedCert.id,
         clientName: data.clientName,
@@ -80,10 +97,10 @@ export default function EmitRps() {
         clientCep: data.clientCep,
         clientBairro: data.clientBairro,
         serviceDescription: data.serviceDescription,
-        serviceValue: parseFloat(data.serviceValue),
-        issRate: parseFloat(data.issRate),
-        deductions: parseFloat(data.deductions),
-        discount: parseFloat(data.discount),
+        serviceValue,
+        issRate,
+        deductions: isNaN(deductions) ? 0 : deductions,
+        discount: isNaN(discount) ? 0 : discount,
         observations: data.observations,
       });
       toast.success('DANFE-Se emitida com sucesso!');

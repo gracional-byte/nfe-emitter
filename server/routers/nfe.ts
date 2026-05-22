@@ -20,6 +20,10 @@ import { notifyOwner } from '../_core/notification';
 import { validateCpfOrCnpj, generateThumbprint } from '../nfe-service';
 import { PrefeituraSoapClient } from '../prefeitura-soap-client';
 import { extractCertificateInfo } from '../certificate-utils';
+import { GovValidationClient } from '../gov-validation-client';
+import { generateDanfsePdf, DanfsePdfData } from '../danfse-generator';
+import { ConsultaNfseClient } from '../consulta-nfse-client';
+import { CancelamentoNfseClient } from '../cancelamento-nfse-client';
 
 const CompanyConfigSchema = z.object({
   cnpj: z.string().min(14).max(14),
@@ -356,8 +360,33 @@ export const nfeRouter = router({
 
         console.log('[NFe Router] Fatura criada:', invoiceId);
 
+        // Validar certificado e RPS via Gov.br
+        const govClient = new GovValidationClient();
+        const govValidation = await govClient.validateRps({
+          certificatePem: certificate.certificateContent,
+          privateKeyPem: certificate.certificateKeyContent,
+          rpsData: {
+            numero: Math.floor(Date.now() / 1000),
+            serie: 'RPS',
+            prestadorCnpj: config.cnpj,
+            tomadorCpfCnpj: input.clientCpfCnpj.replace(/\D/g, ''),
+            servicoValor: input.serviceValue,
+            dataEmissao: new Date().toISOString().split('T')[0],
+          },
+        });
+
+        if (!govValidation.valid) {
+          console.error('[NFe Router] Validação Gov.br falhou:', govValidation.error);
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Validação falhou: ${govValidation.error}`,
+          });
+        }
+
+        console.log('[NFe Router] Validação Gov.br passou:', govValidation.message);
+
         // Emitir DANFE-Se via WebService da Prefeitura
-        const soapClient = new PrefeituraSoapClient(); // Conectar ao webservice da Prefeitura SPção
+        const soapClient = new PrefeituraSoapClient(); // Conectar ao webservice da Prefeitura SP
         
         const nfseResult = await soapClient.enviarRps(
           {
@@ -392,12 +421,70 @@ export const nfeRouter = router({
 
         // Atualizar fatura com resultado
         if (nfseResult.success) {
-          await updateInvoice(invoiceId, {
-            status: 'authorized',
-            nfseNumber: nfseResult.nfseNumber,
-            protocolNumber: nfseResult.protocol || '',
-            emittedAt: new Date(),
-          });
+          // Gerar PDF DANFE-Se
+          console.log('[NFe Router] Gerando PDF DANFE-Se...');
+          const danfsePdfData: DanfsePdfData = {
+            nfseNumber: nfseResult.nfseNumber || 'PENDENTE',
+            seriesNumber: '1',
+            emissionDate: new Date().toLocaleDateString('pt-BR'),
+            verificationCode: nfseResult.protocol || 'PENDENTE',
+            
+            prestadorName: config.cnpj, // Será preenchido com dados reais da empresa
+            prestadorCnpj: config.cnpj,
+            prestadorInscricaoMunicipal: config.inscricaoMunicipal,
+            prestadorAddress: 'Endereço da Empresa',
+            prestadorCity: 'São Paulo',
+            prestadorState: 'SP',
+            prestadorCep: '01000000',
+            
+            tomadorName: input.clientName,
+            tomadorCpfCnpj: input.clientCpfCnpj,
+            tomadorAddress: input.clientAddress,
+            tomadorCity: input.clientCity,
+            tomadorState: input.clientState,
+            tomadorCep: input.clientCep,
+            tomadorBairro: input.clientBairro,
+            
+            serviceDescription: input.serviceDescription,
+            serviceValue: input.serviceValue,
+            issRate: input.issRate,
+            issValue: (input.serviceValue * input.issRate) / 100,
+            deductions: input.deductions || 0,
+            discount: input.discount || 0,
+            netValue: input.serviceValue - (input.deductions || 0) - (input.discount || 0),
+            
+            observations: input.observations,
+          };
+          
+          try {
+            const pdfBuffer = await generateDanfsePdf(danfsePdfData);
+            
+            // Armazenar PDF no S3
+            console.log('[NFe Router] Armazenando PDF no S3...');
+            const pdfStorageKey = `nfse/${ctx.user.id}/${nfseResult.nfseNumber}.pdf`;
+            const { url: pdfUrl } = await storagePut(pdfStorageKey, pdfBuffer, 'application/pdf');
+            
+            console.log('[NFe Router] PDF armazenado com sucesso:', pdfUrl);
+            
+            // Atualizar fatura com dados da emissão
+            await updateInvoice(invoiceId, {
+              status: 'authorized',
+              nfseNumber: nfseResult.nfseNumber,
+              protocolNumber: nfseResult.protocol || '',
+              emittedAt: new Date(),
+              pdfUrl: pdfUrl,
+              pdfStorageKey: pdfStorageKey,
+            });
+          } catch (pdfError: any) {
+            console.error('[NFe Router] Erro ao gerar PDF:', pdfError?.message);
+            // Continuar mesmo se falhar ao gerar PDF
+            await updateInvoice(invoiceId, {
+              status: 'authorized',
+              nfseNumber: nfseResult.nfseNumber,
+              protocolNumber: nfseResult.protocol || '',
+              emittedAt: new Date(),
+            });
+          }
 
           await notifyOwner({
             title: 'DANFE-Se Emitida com Sucesso',
@@ -439,4 +526,229 @@ export const nfeRouter = router({
   getInvoiceStats: protectedProcedure.query(async ({ ctx }) => {
     return getInvoiceStats(ctx.user.id);
   }),
+
+  /**
+   * Download do PDF DANFE-Se
+   */
+  downloadPdf: protectedProcedure
+    .input(z.object({ invoiceId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const invoices = await getInvoicesByUser(ctx.user.id);
+        const invoiceData = Array.isArray(invoices) 
+          ? invoices.find(inv => inv.id === input.invoiceId)
+          : invoices;
+
+        if (!invoiceData) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Nota fiscal não encontrada',
+          });
+        }
+
+        if (!invoiceData.pdfUrl) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'PDF não disponível para esta nota fiscal',
+          });
+        }
+
+        return {
+          pdfUrl: invoiceData.pdfUrl,
+          fileName: `DANFE-Se-${invoiceData.nfseNumber}.pdf`,
+        };
+      } catch (error: any) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error?.message || 'Erro ao obter PDF',
+        });
+      }
+    }),
+
+  /**
+   * Consultar NFS-e na Prefeitura
+   */
+  consultarNfse: protectedProcedure
+    .input(z.object({ invoiceId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const invoices = await getInvoicesByUser(ctx.user.id);
+        const invoiceData = Array.isArray(invoices) 
+          ? invoices.find(inv => inv.id === input.invoiceId)
+          : invoices;
+
+        if (!invoiceData) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Nota fiscal não encontrada',
+          });
+        }
+
+        if (!invoiceData.nfseNumber) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Nota fiscal ainda não foi emitida',
+          });
+        }
+
+        console.log('[NFe Router] Consultando NFS-e:', invoiceData.nfseNumber);
+
+        // Obter certificado do usuário
+        const certificate = await getActiveCertificate(ctx.user.id);
+        if (!certificate) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Certificado não encontrado',
+          });
+        }
+
+        // Obter configurações da empresa
+        const config = await getCompanyConfig(ctx.user.id);
+        if (!config) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Configurações da empresa não encontradas',
+          });
+        }
+
+        // Consultar na Prefeitura
+        const consultaClient = new ConsultaNfseClient();
+        const consultaResult = await consultaClient.consultarNfse({
+          nfseNumber: invoiceData.nfseNumber,
+          prestadorCnpj: config.cnpj,
+          tomadorCpfCnpj: invoiceData.clientCpfCnpj,
+          certificateContent: certificate.certificateContent || '',
+          certificateKeyContent: certificate.certificateKeyContent || '',
+        });
+
+        if (consultaResult.success) {
+          console.log('[NFe Router] Consulta bem-sucedida:', consultaResult);
+          return {
+            success: true,
+            nfseNumber: consultaResult.nfseNumber,
+            status: consultaResult.status,
+            emissionDate: consultaResult.emissionDate,
+            verificationCode: consultaResult.verificationCode,
+          };
+        } else {
+          console.error('[NFe Router] Erro na consulta:', consultaResult.error);
+          // Retornar dados armazenados como fallback
+          return {
+            success: false,
+            nfseNumber: invoiceData.nfseNumber,
+            status: invoiceData.status,
+            emittedAt: invoiceData.emittedAt,
+            protocolNumber: invoiceData.protocolNumber,
+            error: consultaResult.error,
+          };
+        }
+      } catch (error: any) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error?.message || 'Erro ao consultar NFS-e',
+        });
+      }
+    }),
+
+  /**
+   * Cancelar NFS-e
+   */
+  cancelarNfse: protectedProcedure
+    .input(z.object({ 
+      invoiceId: z.number(),
+      justificativa: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const invoices = await getInvoicesByUser(ctx.user.id);
+        const invoiceData = Array.isArray(invoices) 
+          ? invoices.find(inv => inv.id === input.invoiceId)
+          : invoices;
+
+        if (!invoiceData) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Nota fiscal não encontrada',
+          });
+        }
+
+        if (!invoiceData.nfseNumber) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Nota fiscal ainda não foi emitida',
+          });
+        }
+
+        if (invoiceData.status === 'cancelled') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Esta nota fiscal já foi cancelada',
+          });
+        }
+
+        console.log('[NFe Router] Cancelando NFS-e:', invoiceData.nfseNumber);
+
+        // Obter certificado do usuário
+        const certificate = await getActiveCertificate(ctx.user.id);
+        if (!certificate) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Certificado não encontrado',
+          });
+        }
+
+        // Obter configurações da empresa
+        const config = await getCompanyConfig(ctx.user.id);
+        if (!config) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Configurações da empresa não encontradas',
+          });
+        }
+
+        // Cancelar na Prefeitura
+        const cancelamentoClient = new CancelamentoNfseClient();
+        const cancelamentoResult = await cancelamentoClient.cancelarNfse({
+          nfseNumber: invoiceData.nfseNumber,
+          prestadorCnpj: config.cnpj,
+          inscricaoMunicipal: config.inscricaoMunicipal,
+          justificativa: input.justificativa || 'Cancelamento solicitado pelo usuário',
+          certificateContent: certificate.certificateContent || '',
+          certificateKeyContent: certificate.certificateKeyContent || '',
+        });
+
+        if (cancelamentoResult.success) {
+          console.log('[NFe Router] Cancelamento bem-sucedido:', cancelamentoResult);
+          
+          // Atualizar status no banco de dados
+          await updateInvoice(invoiceData.id, {
+            status: 'cancelled',
+            errorMessage: `Cancelada em ${cancelamentoResult.cancelmentDate}: ${input.justificativa || 'Sem justificativa'}`,
+          });
+
+          await notifyOwner({
+            title: 'DANFE-Se Cancelada com Sucesso',
+            content: `NFS-e ${invoiceData.nfseNumber} foi cancelada na Prefeitura`,
+          });
+
+          return {
+            success: true,
+            message: 'Nota fiscal cancelada com sucesso',
+            nfseNumber: invoiceData.nfseNumber,
+            protocolNumber: cancelamentoResult.protocolNumber,
+          };
+        } else {
+          console.error('[NFe Router] Erro no cancelamento:', cancelamentoResult.error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Erro ao cancelar na Prefeitura: ${cancelamentoResult.error}`,
+          });
+        }
+      } catch (error: any) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error?.message || 'Erro ao cancelar NFS-e',
+        });
+      }
+    }),
 });
