@@ -9,7 +9,7 @@ import { trpc } from '@/lib/trpc';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 
-export function History() {
+export default function History() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
 
